@@ -57,6 +57,23 @@ Swift code (`apps/ios`). Gmail and IMAP are noted where they differ.
 | After archive: next / previous           | ✓                        | ✓            | ✓              |
 | Snooze                                   | —                        | —            | —              |
 
+## Projects
+
+A project keeps the conversations, documents, links and notes of one piece of work (a contract,
+a deal) together until it's settled. Projects follow the Otter account; the relay keeps which
+conversations are in one, never their mail.
+
+| Feature                                                    | Mac                 | Web | iPhone |
+| ---------------------------------------------------------- | ------------------- | --- | ------ |
+| Projects in the sidebar, settled ones on a folded shelf    | ✓                   | ✓   | —      |
+| Add conversations (menu, drag onto a project), remove them | ✓                   | ✓   | —      |
+| Conversations from every mailbox in one list               | ✓                   | ✓   | —      |
+| Notes, links                                               | ✓                   | ✓   | —      |
+| Documents: its conversations' attachments, as versions     | ✓                   | ✓   | —      |
+| Settle, reopen                                             | ✓                   | ✓   | —      |
+| Synced through the Otter account                           | ✓ (offline: queued) | ✓   | —      |
+| Uploaded files                                             | —                   | —   | —      |
+
 ## Composing & sending
 
 | Feature                                | Mac                                            | Web | iPhone                   |
@@ -138,11 +155,15 @@ Swift code (`apps/ios`). Gmail and IMAP are noted where they differ.
 | Attach images and files to a chat                  | ✓                           | ✓                          | —            |
 | Queued follow-ups                                  | ✓                           | ✓                          | —            |
 | Mail and calendar tools (Claude, Codex)            | ✓ (every mailbox)           | —                          | —            |
+| Project tools (Claude, Codex)                      | ✓                           | —                          | —            |
+| Projects for agents elsewhere (relay MCP, token)   | ✓ (Hermes)                  | ✓ (Hermes)                 | ✓ (Hermes)   |
 
 Claude and Codex get Otter Mail's own tools (an MCP server in the Mac app's backend), so they
 need no mail CLI: search, read and sort mail, download attachments, save drafts and send, in
 any mailbox (Gmail or IMAP), and list, add, change and answer events in Google Calendar. A tool
-that changes a mailbox asks first unless the chat has full access; drafts don't ask.
+that changes a mailbox asks first unless the chat has full access; drafts don't ask. They manage
+projects too (create, add conversations and links, keep the notes, settle); Hermes gets the project
+tools from the relay, with an agent token.
 
 ## Translation
 

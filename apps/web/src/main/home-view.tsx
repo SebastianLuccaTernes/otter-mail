@@ -5,6 +5,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { CircleCheckIcon, FolderOpenIcon } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
 import { useQueryClient } from "@tanstack/react-query";
@@ -82,6 +83,9 @@ import {
 import { ALL_MAIL_LABEL_ID } from "./gmail/label-names";
 import { useMonochromeTheme } from "./theme/apply-theme";
 import { useMailboxes } from "./mailboxes";
+import { projectIdOf, projectLabelId, useProject, useProjects } from "./gmail/projects";
+import { ProjectView } from "./gmail/project-view";
+import { NewProjectDialog } from "./gmail/project-menus";
 
 /** Narrowest the reader gets when the chat panel is dragged wider. */
 const READER_MIN_WIDTH = 360;
@@ -193,6 +197,42 @@ const PANE_CHAT = `${PANE} relative before:pointer-events-none before:absolute b
     Code's panel animations); the pane keeps its width so nothing reflows. */
 const PANE_FRAME =
   "flex min-h-0 shrink-0 overflow-hidden [[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out";
+
+/** The top of a project's list: its page (notes, documents, links). */
+function ProjectOverviewRow({
+  name,
+  settled,
+  selected,
+  onSelect,
+}: {
+  name: string;
+  settled: boolean;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <div className="px-1 pb-1.5">
+      <button
+        type="button"
+        onClick={onSelect}
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+          selected ? "bg-sidebar-row-active" : "hover:bg-sidebar-row-hover",
+        )}
+      >
+        {settled ? (
+          <CircleCheckIcon className="size-4 shrink-0 text-muted-foreground" />
+        ) : (
+          <FolderOpenIcon className="size-4 shrink-0 text-muted-foreground" />
+        )}
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{name}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {settled ? "Settled" : "Overview"}
+        </span>
+      </button>
+    </div>
+  );
+}
 
 export function HomeView() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
@@ -677,8 +717,17 @@ export function HomeView() {
 
   // If the selected view disappears (deleted, or it has no rules for the
   // active account), fall back to Inbox.
+  const selectedProjectId = projectIdOf(selectedLabelId);
+  const selectedProject = useProject(selectedProjectId);
+  const projectsLoaded = useProjects().isSuccess;
   useEffect(() => {
     if (selectedLabelId === SEARCH_MAILBOX) return;
+    // A project is every mailbox's; one deleted (here or elsewhere) goes back to Inbox.
+    if (selectedProjectId) {
+      if (projectsLoaded && !selectedProject)
+        setSelectedLabelId(isCombined ? INBOX_VIEW_ID : "INBOX");
+      return;
+    }
     if (isCombined) {
       if (!views.some((v) => v.id === selectedLabelId)) {
         setSelectedLabelId(INBOX_VIEW_ID);
@@ -690,7 +739,15 @@ export function HomeView() {
     if (view.mailbox !== effectiveAccountId) {
       setSelectedLabelId("INBOX");
     }
-  }, [isCombined, views, selectedLabelId, effectiveAccountId]);
+  }, [
+    isCombined,
+    views,
+    selectedLabelId,
+    effectiveAccountId,
+    selectedProjectId,
+    projectsLoaded,
+    selectedProject,
+  ]);
 
   // Local-first: keep the on-disk cache synced in the background. Combined mode
   // refreshes all accounts via its own list handler (sentinel isn't a real account).
@@ -722,8 +779,12 @@ export function HomeView() {
     root.setProperty("--ring", brand);
   }, [brand]);
 
-  // Resolve the selected view to concrete per-account rules.
+  // Resolve the selected view to concrete per-account rules. A project's
+  // conversations list like a Combined view (every mailbox's), without rules.
   const combined = (() => {
+    if (selectedProject) {
+      return { viewId: projectLabelId(selectedProject.id), name: selectedProject.name, rules: [] };
+    }
     if (isCombined) {
       const view = views.find((v) => v.id === selectedLabelId) ?? views[0];
       return {
@@ -1179,6 +1240,24 @@ export function HomeView() {
                     onOpenChat={openChat}
                     onSearchView={searchFromView}
                     viewQueryRef={viewQueryRef}
+                    project={
+                      selectedProject && !activeSearch
+                        ? {
+                            id: selectedProject.id,
+                            leading: (
+                              <ProjectOverviewRow
+                                name={selectedProject.name}
+                                settled={selectedProject.status === "settled"}
+                                selected={!selectedMessageId}
+                                onSelect={() => {
+                                  setSelectedMessageId(null);
+                                  setReaderAccountId(null);
+                                }}
+                              />
+                            ),
+                          }
+                        : undefined
+                    }
                     search={
                       activeSearch
                         ? {
@@ -1222,6 +1301,14 @@ export function HomeView() {
                     }}
                     prefill={mailtoPrefill ?? undefined}
                   />
+                ) : selectedProject && !selectedMessageId && !searchActive ? (
+                  <ProjectView
+                    project={selectedProject}
+                    onOpenMessage={(accountId, messageId) =>
+                      handleSelectMessage(messageId, accountId)
+                    }
+                    onAskAssistant={openChat}
+                  />
                 ) : readerAccount ? (
                   <MessageReader
                     titleTrailing={titleTrailing}
@@ -1246,6 +1333,7 @@ export function HomeView() {
                       setComposeOpen(true);
                     }}
                     onSearchSender={(email) => handleSearchChange(`from:${email}`)}
+                    onOpenProject={(id) => handleSelectLabel(projectLabelId(id))}
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center">
@@ -1282,6 +1370,11 @@ export function HomeView() {
                       selectedRows={chatSelection}
                       quote={pendingQuote}
                       onClearQuote={() => setPendingQuote(null)}
+                      project={
+                        selectedProject && !searchActive
+                          ? { id: selectedProject.id, name: selectedProject.name }
+                          : null
+                      }
                     />
                   </div>
                 </div>
@@ -1302,6 +1395,8 @@ export function HomeView() {
           }}
         />
       ) : null}
+
+      <NewProjectDialog onOpenProject={(id) => handleSelectLabel(projectLabelId(id))} />
 
       {accounts.length > 0 ? (
         <CommandPalette

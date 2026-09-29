@@ -33,6 +33,7 @@ import {
   CircleDotIcon,
   CircleChevronDownIcon,
   PaperclipIcon,
+  FolderIcon,
 } from "lucide-react";
 import { IconBtn, HintTooltip, cn } from "./ui";
 import {
@@ -71,6 +72,8 @@ import type { GmailAccount, GmailLabel, GmailMessageSummary, ViewRule } from "./
 import { pickAdvanceTarget } from "./advance-direction";
 import { beginUndoGroup, clearUndo } from "./undo";
 import { isMoveSourceLabel, setThreadDragImage, writeThreadDrag } from "./thread-drag";
+import { useProjectThreads } from "./projects";
+import { AddToProjectItems } from "./project-menus";
 
 type ResolveLabel = (accountId: string | undefined, labelId: string) => GmailLabel | undefined;
 
@@ -115,6 +118,11 @@ type MessageListProps = {
 
   /** Set when this is the Search mailbox (Gmail's own search). */
   search?: SearchMode;
+  /**
+   * Set when the list is a project's conversations (with `combined` for its
+   * cross-mailbox rows, rules empty); `leading` tops the list (its overview).
+   */
+  project?: { id: string; leading: ReactNode };
 };
 
 /** The Search mailbox: the query that ran, its account scope, and its controls. */
@@ -542,6 +550,19 @@ function MessageRow({
           <ContextMenuItem icon="cursorarrow" onSelect={onChatAgent}>
             Open in agent chat
           </ContextMenuItem>
+          <ContextMenuSub label="Add to project">
+            <AddToProjectItems
+              threads={[
+                {
+                  accountId: message.accountId ?? accountId,
+                  threadId: message.threadId || message.id,
+                },
+              ]}
+              suggestedName={message.subject}
+              Item={ContextMenuItem}
+              Separator={ContextMenuSeparator}
+            />
+          </ContextMenuSub>
           <ContextMenuSeparator />
           <ContextMenuSub label={labelChoices.folders ? "Move to folder" : "Label"}>
             {renderLabelChoices(labelChoices, {
@@ -648,6 +669,11 @@ function ThreadMessageRow({
 }
 
 /** "260 messages, 7 unread" — omits the unread clause when nothing is unread. */
+function formatConversationSummary(total: number, unread: number): string {
+  const conversations = `${total.toLocaleString()} conversation${total === 1 ? "" : "s"}`;
+  return unread > 0 ? `${conversations} · ${unread.toLocaleString()} unread` : conversations;
+}
+
 function formatMailboxSummary(total: number, unread: number): string {
   const messages = `${total.toLocaleString()} message${total === 1 ? "" : "s"}`;
   return unread > 0 ? `${messages} · ${unread.toLocaleString()} unread` : messages;
@@ -670,6 +696,7 @@ export function MessageList({
   onSearchView,
   viewQueryRef,
   search,
+  project,
 }: MessageListProps) {
   const isCombined = combined != null;
   // This device isn't signed in to the mailbox (e.g. it was added on another device).
@@ -697,11 +724,14 @@ export function MessageList({
     isCombined && !searching,
   );
   const gmailSearch = useGmailSearch(searchQuery, search?.accountIds ?? [], globalSearching);
+  const projectThreads = useProjectThreads(project && !searching ? project.id : null);
   const messagesQuery = globalSearching
     ? gmailSearch
-    : isCombined
-      ? combinedMessages
-      : accountMessages;
+    : project
+      ? projectThreads
+      : isCombined
+        ? combinedMessages
+        : accountMessages;
 
   const resolveLabel = useLabelResolver(isCombined ? accountIds : [accountId]);
   // Combined mode has no single "active account" to drive per-account label
@@ -726,8 +756,13 @@ export function MessageList({
       ? viewSearchQuery(combined.rules, nameOf)
       : (labelSearchToken(labelId, nameOf(accountId, labelId)) ?? "");
   }
-  const { mailboxTotal, mailboxUnread } =
-    isCombined || allMailRules.length > 0
+  const projectRows = projectThreads.data?.pages[0]?.messages;
+  const { mailboxTotal, mailboxUnread } = project
+    ? {
+        mailboxTotal: projectRows?.length ?? 0,
+        mailboxUnread: projectRows?.filter((m) => m.threadUnread ?? m.unread).length ?? 0,
+      }
+    : isCombined || allMailRules.length > 0
       ? {
           mailboxTotal: combinedCounts.data?.total ?? 0,
           mailboxUnread: combinedCounts.data?.unread ?? 0,
@@ -1490,7 +1525,9 @@ export function MessageList({
       >
         {headerLeading}
         <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-          {formatMailboxSummary(mailboxTotal, mailboxUnread)}
+          {project
+            ? formatConversationSummary(mailboxTotal, mailboxUnread)
+            : formatMailboxSummary(mailboxTotal, mailboxUnread)}
         </div>
         <HintTooltip label="Search this mailbox" shortcut="search.focus">
           <IconBtn label="Search this mailbox" onClick={onSearchView}>
@@ -1522,7 +1559,19 @@ export function MessageList({
           checked.size > 0 ? "pb-16" : "",
         ].join(" ")}
       >
-        {signedOutAccount && !isCombined && !search && visibleMessages.length === 0 ? (
+        {project && !search ? project.leading : null}
+        {project && !search && !isLoading && visibleMessages.length === 0 ? (
+          <EmptyState
+            className="px-6 pt-10"
+            media={<FolderIcon className="size-10 stroke-[1.25] text-muted-foreground" />}
+            title={unreadOnly ? "No unread conversations" : "No conversations yet"}
+            description={
+              unreadOnly
+                ? "Everything here has been read."
+                : "Drag conversations onto the project in the sidebar, or add them from a conversation's menu."
+            }
+          />
+        ) : signedOutAccount && !isCombined && !search && visibleMessages.length === 0 ? (
           <SignedOutMailbox account={signedOutAccount} />
         ) : isLoading ? (
           <div className="flex flex-col gap-0">
