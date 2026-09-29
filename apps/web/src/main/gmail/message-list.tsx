@@ -120,9 +120,9 @@ type MessageListProps = {
   search?: SearchMode;
   /**
    * Set when the list is a project's conversations (with `combined` for its
-   * cross-mailbox rows, rules empty); `leading` tops the list (its overview).
+   * cross-mailbox rows, rules empty), optionally one mailbox's of them.
    */
-  project?: { id: string; leading: ReactNode };
+  project?: { id: string; mailbox: string | null };
 };
 
 /** The Search mailbox: the query that ran, its account scope, and its controls. */
@@ -756,7 +756,9 @@ export function MessageList({
       ? viewSearchQuery(combined.rules, nameOf)
       : (labelSearchToken(labelId, nameOf(accountId, labelId)) ?? "");
   }
-  const projectRows = projectThreads.data?.pages[0]?.messages;
+  const projectRows = projectThreads.data?.pages[0]?.messages.filter(
+    (m) => !project?.mailbox || m.accountId === project.mailbox,
+  );
   const { mailboxTotal, mailboxUnread } = project
     ? {
         mailboxTotal: projectRows?.length ?? 0,
@@ -771,9 +773,12 @@ export function MessageList({
 
   // Search pages are merged per account; a conversation seen on an earlier
   // page isn't repeated.
+  const projectMailbox = project?.mailbox ?? null;
   const allMessages: GmailMessageSummary[] = useMemo(() => {
     const pages: { messages: GmailMessageSummary[] }[] = messagesQuery.data?.pages ?? [];
-    const rows = pages.flatMap((p) => p.messages);
+    const rows = pages
+      .flatMap((p) => p.messages)
+      .filter((m) => !projectMailbox || m.accountId === projectMailbox);
     if (!globalSearching) return rows;
     const seen = new Set<string>();
     return rows.filter((m) => {
@@ -782,7 +787,7 @@ export function MessageList({
       seen.add(key);
       return true;
     });
-  }, [messagesQuery.data, globalSearching]);
+  }, [messagesQuery.data, globalSearching, projectMailbox]);
   // In Unread mode, clicking a message marks it read (optimistically), which
   // would normally drop it from this filter instantly. Keep the currently
   // selected row pinned in place — Gmail-style — so it only disappears once the
@@ -1559,7 +1564,6 @@ export function MessageList({
           checked.size > 0 ? "pb-16" : "",
         ].join(" ")}
       >
-        {project && !search ? project.leading : null}
         {project && !search && !isLoading && visibleMessages.length === 0 ? (
           <EmptyState
             className="px-6 pt-10"
