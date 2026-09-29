@@ -369,9 +369,16 @@ function formatAgo(ts: number): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+const PROVIDER_NAMES: Record<ProviderKind, string> = {
+  hermes: "Hermes",
+  codex: "Codex",
+  claude: "Claude",
+  apple: "Apple Intelligence",
+};
+
 /** Canonical error codes from the backend → what the transcript says. */
 function friendlyError(code: string, provider: ProviderKind): string {
-  const name = provider === "codex" ? "Codex" : provider === "claude" ? "Claude" : "Hermes";
+  const name = PROVIDER_NAMES[provider];
   switch (code) {
     case "not_configured":
       return `${name} isn't set up — connect it in Settings → Assistant.`;
@@ -382,9 +389,9 @@ function friendlyError(code: string, provider: ProviderKind): string {
     case "unauthorized":
       return "The API key was rejected — update it in Settings.";
     case "unreachable":
-      return provider === "codex"
-        ? "Lost the connection to Codex — send again to retry."
-        : "Can't reach Hermes — are you on Tailscale?";
+      return provider === "hermes"
+        ? "Can't reach Hermes — are you on Tailscale?"
+        : `Lost the connection to ${name} — send again to retry.`;
     case "timeout":
       return `${name} went quiet for too long — the run was stopped.`;
     case "cancelled":
@@ -881,7 +888,7 @@ export function AssistantChatPanel({
   const providerKind: ProviderKind =
     active && active.turns.length > 0 ? active.provider : selectedKind;
   const provider = providersState?.providers.find((p) => p.kind === providerKind);
-  const providerName = provider?.displayName ?? (providerKind === "codex" ? "Codex" : "Hermes");
+  const providerName = provider?.displayName ?? PROVIDER_NAMES[providerKind];
   const usable = isProviderUsable(provider);
   const sessionsAvailable = Boolean(provider?.sessions && usable);
   // Finished runs fold their tool rows behind a "Worked for …" summary.
@@ -1603,18 +1610,20 @@ export function AssistantChatPanel({
   /** Setup fallback: switch new chats to another provider. */
   const pickProvider = (kind: ProviderKind) => updateSettings({ selected: kind });
 
-  // Hermes' approval mode is server-side config; Codex / Claude pick it per turn.
+  // Hermes' approval mode is server-side config; Codex / Claude pick it per
+  // turn; Apple Intelligence only reads.
+  const kindSettings = providersState?.settings[providerKind];
   const runtimeMode =
-    providerKind === "hermes" ? null : (providersState?.settings[providerKind].runtimeMode ?? null);
+    kindSettings && "runtimeMode" in kindSettings ? kindSettings.runtimeMode : null;
   const pendingApproval = activeApprovals[0];
 
   // Reasoning / Service Tier of the model in use, with the saved choices.
   const currentModel = provider?.models.find((m) => m.slug === provider.model);
   const traitOptions = currentModel?.options ?? [];
-  const traitSettings = providersState?.settings[providerKind];
   const traitValues = {
-    reasoningEffort: traitSettings?.reasoningEffort ?? "",
-    serviceTier: traitSettings?.serviceTier ?? "",
+    reasoningEffort:
+      kindSettings && "reasoningEffort" in kindSettings ? kindSettings.reasoningEffort : "",
+    serviceTier: kindSettings && "serviceTier" in kindSettings ? kindSettings.serviceTier : "",
   };
 
   // An empty chat whose provider can't run yet shows setup instead of a composer.

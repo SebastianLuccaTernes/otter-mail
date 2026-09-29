@@ -196,7 +196,10 @@ export function createBuildConfig(options: {
     nodeGypRebuild: false,
     files: ["package.json", "dist-electron/**/*", "renderer/**/*", "!**/*.map"],
     directories: { buildResources: "resources", output: "dist" },
-    extraResources: [{ from: "bin/translator", to: "bin/translator" }],
+    extraResources: [
+      { from: "bin/translator", to: "bin/translator" },
+      { from: "bin/apple-intelligence", to: "bin/apple-intelligence" },
+    ],
     mac: {
       target: options.target === "dmg" ? ["dmg", "zip"] : ["zip"],
       category: "public.app-category.productivity",
@@ -367,8 +370,13 @@ function main(): void {
   copyDir(NodePath.join(webDir, "dist"), NodePath.join(stageDir, "renderer"), notMap);
   copyDir(NodePath.join(desktopDir, "resources"), NodePath.join(stageDir, "resources"));
   NodeFS.mkdirSync(NodePath.join(stageDir, "bin"));
-  NodeFS.copyFileSync(translatorBinary, NodePath.join(stageDir, "bin", "translator"));
-  NodeFS.chmodSync(NodePath.join(stageDir, "bin", "translator"), 0o755);
+  // The package's helpers build side by side.
+  for (const helper of ["translator", "apple-intelligence"]) {
+    const source = NodePath.join(NodePath.dirname(translatorBinary), helper);
+    if (!NodeFS.existsSync(source)) fail(`${source} is missing; drop --skip-build.`);
+    NodeFS.copyFileSync(source, NodePath.join(stageDir, "bin", helper));
+    NodeFS.chmodSync(NodePath.join(stageDir, "bin", helper), 0o755);
+  }
 
   let entitlementsPath: string | undefined;
   if (options.signed) {

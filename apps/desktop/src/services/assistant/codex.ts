@@ -16,7 +16,7 @@ import {
   type Notification,
   type ServerRequest,
 } from "./codex-app-server.js";
-import { dataUrl } from "@otter-mail/core";
+import { MAIL_TOOLS, dataUrl, mailToolSchema, runMailTool } from "@otter-mail/core";
 import { assistantWorkspace, withAttachmentPaths } from "./local.js";
 import { ASSISTANT_INSTRUCTIONS } from "./instructions.js";
 import type {
@@ -261,11 +261,29 @@ function toApproval(request: ServerRequest): ApprovalRequest | null {
   }
 }
 
+/** Otter Mail's mail tools, as Codex dynamic tools (answered by `item/tool/call`). */
+const MAIL_DYNAMIC_TOOLS = MAIL_TOOLS.map((tool) => ({
+  type: "function",
+  name: tool.name,
+  description: tool.description,
+  inputSchema: mailToolSchema(tool),
+}));
+
 /**
- * Approvals go to the user as `approval` events and wait for their answer;
- * other requests (user input, MCP elicitation) are answered empty.
+ * Mail tool calls run in core; approvals go to the user as `approval` events
+ * and wait for their answer; other requests (user input, MCP elicitation) are
+ * answered empty.
  */
 function handleServerRequest(session: Session, request: ServerRequest): void {
+  if (request.method === "item/tool/call") {
+    void runMailTool(String(request.params.tool), request.params.arguments).then((text) =>
+      session.server.respond(request.id, {
+        contentItems: [{ type: "inputText", text }],
+        success: !text.startsWith("Error: "),
+      }),
+    );
+    return;
+  }
   const approval = toApproval(request);
   const turn = session.turn;
   if (approval && turn) {
@@ -414,13 +432,13 @@ async function openSession(
             });
             return server.request<{ thread: { id: string } }>(
               "thread/start",
-              params,
+              { ...params, dynamicTools: MAIL_DYNAMIC_TOOLS },
               REQUEST_TIMEOUT_MS,
             );
           })
       : await server.request<{ thread: { id: string } }>(
           "thread/start",
-          params,
+          { ...params, dynamicTools: MAIL_DYNAMIC_TOOLS },
           REQUEST_TIMEOUT_MS,
         );
     threadId = opened.thread.id;

@@ -102,7 +102,10 @@ async function findFreePort(start: number): Promise<number> {
 }
 
 function ensureTranslator(): void {
-  if (findTranslatorBinary("host") || findTranslatorBinary("universal")) return;
+  // Its sibling, the Apple Intelligence helper, came later: builds from before it rebuild.
+  const built = findTranslatorBinary("host") ?? findTranslatorBinary("universal");
+  if (built && NodeFS.existsSync(NodePath.join(NodePath.dirname(built), "apple-intelligence")))
+    return;
   console.log("[dev] Building native/translator (first run only)...");
   try {
     console.log(`[dev] Translator ready: ${buildTranslator({ universal: false, quiet: true })}`);

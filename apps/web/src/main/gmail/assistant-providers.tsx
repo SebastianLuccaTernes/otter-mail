@@ -71,7 +71,32 @@ function ClaudeIcon({ className }: { className?: string }) {
   );
 }
 
+/** Apple Intelligence's glow: a ring in its colors. */
+function AppleIntelligenceIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <defs>
+        <linearGradient id="apple-intelligence-ring" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f5a623" />
+          <stop offset="0.35" stopColor="#f0418c" />
+          <stop offset="0.7" stopColor="#8b5cf6" />
+          <stop offset="1" stopColor="#3b82f6" />
+        </linearGradient>
+      </defs>
+      <circle
+        cx="12"
+        cy="12"
+        r="8.5"
+        fill="none"
+        stroke="url(#apple-intelligence-ring)"
+        strokeWidth="3.5"
+      />
+    </svg>
+  );
+}
+
 export function ProviderIcon({ kind, className }: { kind: ProviderKind; className?: string }) {
+  if (kind === "apple") return <AppleIntelligenceIcon className={cn("size-4", className)} />;
   if (kind === "codex") return <OpenAIIcon className={cn("size-4", className)} />;
   if (kind === "claude") return <ClaudeIcon className={cn("size-4", className)} />;
   return <HermesIcon className={cn("size-4", className)} />;

@@ -19,6 +19,7 @@ import { broadcast } from "./ipc.js";
 import { logger } from "./logger.js";
 import { googleAuth } from "./services/gmail-oauth.js";
 import { connectMailSocket } from "./services/mail-socket.js";
+import { appleProvider } from "./services/assistant/apple.js";
 import { claudeProvider } from "./services/assistant/claude.js";
 import { codexProvider } from "./services/assistant/codex.js";
 import { setPendingOpenMessage } from "./services/open-message-target.js";
@@ -223,6 +224,6 @@ export function desktopPlatform(): Platform {
     },
     offlineDownloads: true,
     translator: appleTranslator,
-    assistantProviders: [codexProvider, claudeProvider],
+    assistantProviders: [codexProvider, claudeProvider, appleProvider],
   };
 }

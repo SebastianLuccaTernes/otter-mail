@@ -17,10 +17,12 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import {
+  createSdkMcpServer,
   deleteSession as sdkDeleteSession,
   getSessionMessages,
   listSessions as sdkListSessions,
   query,
+  tool,
   type CanUseTool,
   type EffortLevel,
   type Options as ClaudeOptions,
@@ -31,6 +33,7 @@ import {
   type SDKMessage,
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 import { logger } from "../../logger.js";
 import fs from "node:fs/promises";
 import {
@@ -41,6 +44,7 @@ import {
 } from "./local.js";
 import { ASSISTANT_INSTRUCTIONS } from "./instructions.js";
 import { ensureShellPath } from "./shell-path.js";
+import { MAIL_TOOLS, runMailTool, type MailTool } from "@otter-mail/core";
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -135,7 +139,37 @@ const APPROVAL_TITLES: Record<ApprovalRequest["kind"], string> = {
 };
 
 /** `Bash: gog gmail …`, a file path, or the tool name + JSON input (≤400 chars). */
+/** The MCP server name Otter Mail's mail tools are under (`mcp__otter-mail__search_mail`). */
+const MAIL_SERVER = "otter-mail";
+
+function mailArguments(t: MailTool) {
+  return Object.fromEntries(
+    t.parameters.map((p) => {
+      const type =
+        p.type === "integer" ? z.number().int() : p.type === "boolean" ? z.boolean() : z.string();
+      const described = type.describe(p.description);
+      return [p.name, p.optional ? described.optional() : described];
+    }),
+  );
+}
+
+/** Otter Mail's mail tools as an in-process MCP server; one per query (a server has one transport). */
+function mailServer() {
+  return createSdkMcpServer({
+    name: MAIL_SERVER,
+    tools: MAIL_TOOLS.map((t) =>
+      tool(t.name, t.description, mailArguments(t), async (args) => {
+        const text = await runMailTool(t.name, args);
+        return { content: [{ type: "text", text }], isError: text.startsWith("Error: ") };
+      }),
+    ),
+  });
+}
+
+const isMailServerTool = (name: string) => name.startsWith(`mcp__${MAIL_SERVER}__`);
+
 function summarizeTool(name: string, input: Record<string, unknown>): string {
+  if (isMailServerTool(name)) name = name.slice(`mcp__${MAIL_SERVER}__`.length);
   const command = input.command ?? input.cmd;
   if (typeof command === "string" && command.trim())
     return `${name}: ${command.trim().slice(0, 400)}`;
@@ -425,7 +459,9 @@ async function openSession(
 
   const canUseTool: CanUseTool = async (toolName, input, options): Promise<PermissionResult> => {
     const turn = session.turn;
-    if (session.mode === "full-access" || !turn) return { behavior: "allow", updatedInput: input };
+    // The mail tools only read the local cache.
+    if (session.mode === "full-access" || !turn || isMailServerTool(toolName))
+      return { behavior: "allow", updatedInput: input };
     const approval: ApprovalRequest = {
       id: options.toolUseID || randomUUID(),
       kind: approvalKind(toolName),
@@ -480,6 +516,7 @@ async function openSession(
     ...(pm === "bypassPermissions" ? { allowDangerouslySkipPermissions: true } : {}),
     ...(sessionId ? { resume: sessionId } : { sessionId: id }),
     includePartialMessages: true,
+    mcpServers: { [MAIL_SERVER]: mailServer() },
     // Attached documents live outside the workspace.
     additionalDirectories: [await attachmentsDir()],
     canUseTool,

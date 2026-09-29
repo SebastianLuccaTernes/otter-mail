@@ -115,7 +115,7 @@ export type MailAppsResult = { apps: MailApp[]; defaultBundleId: string | null }
  * Assistant providers (mirrors main/services/assistant/types.ts). A snapshot
  * is one provider's health; every provider streams the same ChatEvents.
  */
-export type ProviderKind = "hermes" | "codex" | "claude";
+export type ProviderKind = "hermes" | "codex" | "claude" | "apple";
 export type ProviderState = "ready" | "warning" | "error" | "disabled";
 export type ProviderOptionChoice = {
   id: string;
@@ -204,6 +204,8 @@ export type ProviderSettingsView = {
     serviceTier: string;
     runtimeMode: RuntimeMode;
   };
+  /** Apple Intelligence (the Mac's on-device model). */
+  apple: { enabled: boolean; model: string };
   hermesHasKey: boolean;
 };
 export type ProvidersState = {
@@ -216,6 +218,7 @@ export type AssistantSettingsPatch = {
   hermes?: { enabled?: boolean; model?: string; reasoningEffort?: string; serviceTier?: string };
   codex?: Partial<ProviderSettingsView["codex"]>;
   claude?: Partial<ProviderSettingsView["claude"]>;
+  apple?: Partial<ProviderSettingsView["apple"]>;
 };
 
 export type ChatEvent =

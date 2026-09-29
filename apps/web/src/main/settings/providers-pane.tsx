@@ -686,6 +686,8 @@ export function ProvidersPane() {
       />
       {current.macAppOnly ? null : current.kind === "hermes" ? (
         <HermesEditor state={state} provider={current} update={update} />
+      ) : current.kind === "apple" ? (
+        <ModelsSection provider={current} />
       ) : (
         <AgentEditor kind={current.kind} state={state} provider={current} update={update} />
       )}

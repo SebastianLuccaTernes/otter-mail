@@ -5,6 +5,7 @@ let package = Package(
   name: "translator",
   platforms: [.macOS(.v13)],
   targets: [
-    .executableTarget(name: "translator")
+    .executableTarget(name: "translator"),
+    .executableTarget(name: "apple-intelligence"),
   ]
 )

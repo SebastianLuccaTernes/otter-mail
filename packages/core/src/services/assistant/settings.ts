@@ -9,6 +9,7 @@ import { platform } from "../../platform.js";
 import {
   PROVIDER_KINDS,
   RUNTIME_MODES,
+  type AppleSettings,
   type ClaudeSettings,
   type RuntimeMode,
   type CodexSettings,
@@ -54,6 +55,8 @@ const DEFAULT_CLAUDE: ClaudeSettings = {
   runtimeMode: "full-access",
 };
 
+const DEFAULT_APPLE: AppleSettings = { enabled: true, model: "" };
+
 /** Runtime modes from before T3's set ("read-only") fall back to supervised. */
 function migrateRuntimeMode<T extends { runtimeMode: RuntimeMode }>(settings: T): T {
   return RUNTIME_MODES.includes(settings.runtimeMode)
@@ -81,6 +84,7 @@ export async function getProviderSettings(): Promise<ProviderSettings> {
     },
     codex: migrateRuntimeMode({ ...DEFAULT_CODEX, ...stored?.codex }),
     claude: migrateRuntimeMode({ ...DEFAULT_CLAUDE, ...stored?.claude }),
+    apple: { ...DEFAULT_APPLE, ...stored?.apple },
   };
   return cache;
 }

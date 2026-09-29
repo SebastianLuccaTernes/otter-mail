@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Builds the native/translator Swift helper (Apple Translation, on-device).
+// Builds the native/translator Swift helpers: `translator` (Apple Translation)
+// and `apple-intelligence` (Foundation Models), both on-device.
 //
 //   node scripts/build-translator.ts              host architecture, release
 //   node scripts/build-translator.ts --universal  arm64 + x86_64, for packaging

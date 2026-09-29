@@ -74,6 +74,13 @@ export * as mailStore from "./services/mail-store.js";
 export { runAsTask } from "./handlers/ipc-budget.js";
 export { ATTACHMENTS_DIR, dataUrl, readAttachment } from "./services/assistant/attachments.js";
 export { shutdownProviders } from "./services/assistant/service.js";
+export {
+  MAIL_TOOLS,
+  isMailTool,
+  mailToolSchema,
+  runMailTool,
+  type MailTool,
+} from "./services/assistant/mail-tools.js";
 export * from "./services/assistant/types.js";
 export { getAttachmentBytes } from "./services/attachment-cache.js";
 export { KEYBINDINGS_FILE } from "./services/keybindings-store.js";

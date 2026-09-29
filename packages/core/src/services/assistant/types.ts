@@ -5,9 +5,9 @@
  * turns, and every provider streams the same canonical {@link ChatEvent}s.
  */
 
-export type ProviderKind = "hermes" | "codex" | "claude";
+export type ProviderKind = "hermes" | "codex" | "claude" | "apple";
 
-export const PROVIDER_KINDS: readonly ProviderKind[] = ["hermes", "codex", "claude"];
+export const PROVIDER_KINDS: readonly ProviderKind[] = ["hermes", "codex", "claude", "apple"];
 
 export type ProviderState = "ready" | "warning" | "error" | "disabled";
 
@@ -142,11 +142,19 @@ export type ClaudeSettings = {
   runtimeMode: RuntimeMode;
 };
 
+/** Apple Intelligence: the Mac's on-device model or Private Cloud Compute. */
+export type AppleSettings = {
+  enabled: boolean;
+  /** "on-device" / "private-cloud"; empty → on-device. */
+  model: string;
+};
+
 export type ProviderSettings = {
   selected: ProviderKind;
   hermes: HermesSettings;
   codex: CodexSettings;
   claude: ClaudeSettings;
+  apple: AppleSettings;
 };
 
 /** Settings as the renderer sees them: Hermes' API key never leaves the backend. */

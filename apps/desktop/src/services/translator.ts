@@ -17,13 +17,17 @@ const STATUSES: ReadonlySet<string> = new Set(["ok", "notInstalled", "unsupporte
 
 const HELPER_TIMEOUT_MS = 60_000;
 
-/** The helper ships in Resources/bin; unpackaged runs use the SwiftPM build. */
-function helperPath(): string {
-  if (app.isPackaged) return path.join(process.resourcesPath, "bin", "translator");
+/**
+ * A native/translator helper (`translator`, `apple-intelligence`). They ship
+ * in Resources/bin; unpackaged runs use the SwiftPM build.
+ */
+export function helperPath(name: string): string {
+  if (app.isPackaged) return path.join(process.resourcesPath, "bin", name);
   const packageDir = path.resolve(__dirname, "..", "..", "..", "native", "translator", ".build");
   const candidates = [
-    path.join(packageDir, "release", "translator"),
-    path.join(packageDir, "apple", "Products", "Release", "translator"),
+    path.join(packageDir, "release", name),
+    path.join(packageDir, "out", "Products", "Release", name),
+    path.join(packageDir, "apple", "Products", "Release", name),
   ];
   return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]!;
 }
@@ -32,7 +36,7 @@ function helperPath(): string {
 function runHelper(command: "detect" | "translate", request: unknown): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const child = execFile(
-      helperPath(),
+      helperPath("translator"),
       [command],
       { timeout: HELPER_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 },
       (error, stdout, stderr) => {

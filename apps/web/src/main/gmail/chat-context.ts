@@ -1,9 +1,9 @@
 import type { GmailMessageSummary } from "./types";
 
 /**
- * Pointer-sized mail context for the assistant chat. The agent has gog
- * access to the same mailboxes, so ids are enough — no mail content leaves
- * the app.
+ * Pointer-sized mail context for the assistant chat. The agent reads the
+ * same mailboxes (Otter Mail's mail tools, or gog), so ids are enough — no
+ * mail content goes with the message.
  */
 export type AssistantContext = {
   /** Owning account email per conversation (falls back to account id). */
@@ -74,6 +74,6 @@ export function buildHandoffText(question: string, context: AssistantContext): s
       );
     }
   }
-  lines.push("Fetch full content with gog if needed.");
+  lines.push("Read them with read_thread (or gog) if needed.");
   return lines.join("\n");
 }

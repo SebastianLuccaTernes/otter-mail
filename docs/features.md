@@ -128,13 +128,14 @@ Swift code (`apps/ios`). Gmail and IMAP are noted where they differ.
 
 ## Assistant
 
-| Feature                                            | Mac                         | Web                        | iPhone       |
-| -------------------------------------------------- | --------------------------- | -------------------------- | ------------ |
-| Providers                                          | Claude, Codex, Hermes       | Hermes (Claude, Codex off) | Hermes       |
-| Chat, models, steer / stop, tool approval, history | ✓                           | ✓                          | ✓            |
-| Chat about a conversation (pointers, not mail)     | ✓ (also selections, quotes) | ✓                          | ✓ (a thread) |
-| Attach images and files to a chat                  | ✓                           | ✓                          | —            |
-| Queued follow-ups                                  | ✓                           | ✓                          | —            |
+| Feature                                            | Mac                                                   | Web                     | iPhone       |
+| -------------------------------------------------- | ----------------------------------------------------- | ----------------------- | ------------ |
+| Providers                                          | Claude, Codex, Hermes, Apple Intelligence (on-device) | Hermes (the others off) | Hermes       |
+| Chat, models, steer / stop, tool approval, history | ✓                                                     | ✓                       | ✓            |
+| Chat about a conversation (pointers, not mail)     | ✓ (also selections, quotes)                           | ✓                       | ✓ (a thread) |
+| Attach images and files to a chat                  | ✓                                                     | ✓                       | —            |
+| Queued follow-ups                                  | ✓                                                     | ✓                       | —            |
+| Mail tools (list the inbox, search, read a thread) | ✓ (Claude, Codex, Apple)                              | —                       | —            |
 
 ## Translation
 
