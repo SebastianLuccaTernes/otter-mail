@@ -5,7 +5,6 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { CircleCheckIcon, FolderOpenIcon } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
 import { useQueryClient } from "@tanstack/react-query";
@@ -26,7 +25,6 @@ import {
   TitleControls,
   TitleTrailing,
   TitlebarInset,
-  WindowTitle,
 } from "./gmail/top-bar";
 import { SettingsPage, type SettingsRoute } from "./settings/settings-page";
 import { SettingsNav } from "./settings/settings-nav";
@@ -83,6 +81,8 @@ import { useMailboxes } from "./mailboxes";
 import { projectIdOf, projectLabelId, useProject, useProjects } from "./gmail/projects";
 import { ProjectView } from "./gmail/project-view";
 import { NewProjectDialog } from "./gmail/project-menus";
+import { ProjectSidebar } from "./gmail/project-sidebar";
+import { MAIL_TAB, WorkspaceTabs, useOpenProjectTabs } from "./gmail/workspace-tabs";
 
 /** Narrowest the reader gets when the chat panel is dragged wider. */
 const READER_MIN_WIDTH = 360;
@@ -194,42 +194,6 @@ const PANE_CHAT = `${PANE} relative before:pointer-events-none before:absolute b
     Code's panel animations); the pane keeps its width so nothing reflows. */
 const PANE_FRAME =
   "flex min-h-0 shrink-0 overflow-hidden [[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out";
-
-/** The top of a project's list: its page (notes, documents, links). */
-function ProjectOverviewRow({
-  name,
-  settled,
-  selected,
-  onSelect,
-}: {
-  name: string;
-  settled: boolean;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <div className="px-1 pb-1.5">
-      <button
-        type="button"
-        onClick={onSelect}
-        className={cn(
-          "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
-          selected ? "bg-sidebar-row-active" : "hover:bg-sidebar-row-hover",
-        )}
-      >
-        {settled ? (
-          <CircleCheckIcon className="size-4 shrink-0 text-muted-foreground" />
-        ) : (
-          <FolderOpenIcon className="size-4 shrink-0 text-muted-foreground" />
-        )}
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{name}</span>
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {settled ? "Settled" : "Overview"}
-        </span>
-      </button>
-    </div>
-  );
-}
 
 export function HomeView() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
@@ -741,6 +705,53 @@ export function HomeView() {
     root.setProperty("--ring", brand);
   }, [brand]);
 
+  // ── Workspace tabs ──────────────────────────────────────────────────────
+  // Mail, and a tab per open project; each tab remembers where it was.
+  const projectTabs = useOpenProjectTabs();
+  const activeTab = selectedProjectId ?? MAIL_TAB;
+  // Which mailbox's conversations a project's list shows (null: all).
+  const [projectMailbox, setProjectMailbox] = useState<string | null>(null);
+  const tabLocs = useRef(new Map<string, NavLoc>());
+  tabLocs.current.set(activeTab, {
+    accountId: selectedAccountId,
+    labelId: selectedLabelId,
+    messageId: selectedMessageId,
+    readerAccountId,
+  });
+  useEffect(() => {
+    if (selectedProjectId && projectsLoaded && selectedProject) projectTabs.add(selectedProjectId);
+  }, [selectedProjectId, projectsLoaded, selectedProject]);
+  const switchTab = (tab: string) => {
+    if (tab === activeTab) {
+      // The active project's tab again: back to its overview.
+      if (tab !== MAIL_TAB) {
+        setSelectedMessageId(null);
+        setReaderAccountId(null);
+      }
+      return;
+    }
+    console.log("[HomeView:switchTab]", { project: tab !== MAIL_TAB });
+    const saved = tabLocs.current.get(tab);
+    setComposeOpen(false);
+    setSettingsRoute(null);
+    setProjectMailbox(null);
+    if (tab === MAIL_TAB) {
+      setSelectedAccountId(saved?.accountId ?? selectedAccountId);
+      setSelectedLabelId(saved?.labelId ?? (isCombined ? INBOX_VIEW_ID : "INBOX"));
+    } else {
+      projectTabs.add(tab);
+      setSelectedLabelId(projectLabelId(tab));
+    }
+    setSelectedMessageId(saved?.messageId ?? null);
+    setReaderAccountId(saved?.readerAccountId ?? null);
+  };
+  const openProject = (id: string) => switchTab(id);
+  const closeProjectTab = (id: string) => {
+    projectTabs.remove(id);
+    tabLocs.current.delete(id);
+    if (activeTab === id) switchTab(MAIL_TAB);
+  };
+
   // Resolve the selected view to concrete per-account rules. A project's
   // conversations list like a Combined view (every mailbox's), without rules.
   const combined = (() => {
@@ -1089,11 +1100,28 @@ export function HomeView() {
   return (
     <>
       <div
-        className="surface-grain flex h-full bg-sidebar-surface text-foreground"
+        className="surface-grain flex h-full flex-col bg-sidebar-surface text-foreground"
         data-panel-animations={panelAnimationsActive ? "true" : "false"}
         style={{ "--panel-animation-duration": `${panelAnimationDurationMs}ms` } as CSSProperties}
       >
-        <div className="contents">
+        <WorkspaceTabs
+          active={activeTab}
+          openIds={projectTabs.open}
+          onSelect={switchTab}
+          onClose={closeProjectTab}
+        />
+        {/* Under the tabs, the panes' own title bands are shorter, and the
+            traffic lights and pinned toggles are the tab strip's. */}
+        <div
+          className="flex min-h-0 flex-1"
+          style={
+            {
+              "--workspace-topbar-height": "44px",
+              "--workspace-titlebar-content-left": "1rem",
+              "--workspace-titlebar-control-size": "0px",
+            } as CSSProperties
+          }
+        >
           {sidebarPresent ? (
             <>
               <div
@@ -1114,14 +1142,25 @@ export function HomeView() {
                   data-app-sidebar=""
                 >
                   {settingsRoute ? (
-                    <>
-                      <WindowTitle />
+                    <div className="flex min-h-0 flex-1 flex-col pt-2">
                       <SettingsNav
                         pane={settingsRoute.pane}
                         onSelect={(pane) => setSettingsRoute({ pane, viewId: null, mailbox: null })}
                         onBack={() => setSettingsRoute(null)}
                       />
-                    </>
+                    </div>
+                  ) : selectedProject ? (
+                    <ProjectSidebar
+                      project={selectedProject}
+                      accounts={accounts}
+                      overview={!selectedMessageId}
+                      onOverview={() => {
+                        setSelectedMessageId(null);
+                        setReaderAccountId(null);
+                      }}
+                      mailbox={projectMailbox}
+                      onMailbox={setProjectMailbox}
+                    />
                   ) : (
                     <AccountsSidebar
                       onOpenSettings={(pane = "general") =>
@@ -1204,20 +1243,7 @@ export function HomeView() {
                     viewQueryRef={viewQueryRef}
                     project={
                       selectedProject && !activeSearch
-                        ? {
-                            id: selectedProject.id,
-                            leading: (
-                              <ProjectOverviewRow
-                                name={selectedProject.name}
-                                settled={selectedProject.status === "settled"}
-                                selected={!selectedMessageId}
-                                onSelect={() => {
-                                  setSelectedMessageId(null);
-                                  setReaderAccountId(null);
-                                }}
-                              />
-                            ),
-                          }
+                        ? { id: selectedProject.id, mailbox: projectMailbox }
                         : undefined
                     }
                     search={
@@ -1295,7 +1321,7 @@ export function HomeView() {
                       setComposeOpen(true);
                     }}
                     onSearchSender={(email) => handleSearchChange(`from:${email}`)}
-                    onOpenProject={(id) => handleSelectLabel(projectLabelId(id))}
+                    onOpenProject={openProject}
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center">
@@ -1357,7 +1383,7 @@ export function HomeView() {
         />
       ) : null}
 
-      <NewProjectDialog onOpenProject={(id) => handleSelectLabel(projectLabelId(id))} />
+      <NewProjectDialog onOpenProject={openProject} />
 
       {accounts.length > 0 ? (
         <CommandPalette

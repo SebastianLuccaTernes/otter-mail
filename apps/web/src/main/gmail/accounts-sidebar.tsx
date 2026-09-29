@@ -43,9 +43,6 @@ import {
   SquarePenIcon,
   RotateCwIcon,
   LogInIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  CircleCheckIcon,
 } from "lucide-react";
 import {
   useLabels,
@@ -73,7 +70,7 @@ import { renameLabelKeybindings, useKeybindingsState } from "../keybindings/stor
 import { formatShortcut, parseShortcut } from "../keybindings/keys";
 import { LabelShortcutDialog } from "../settings/keybindings-pane";
 import { UnreadPill, HintTooltip } from "./ui";
-import { MailboxDots, MailboxSwitcher, WindowTitle, useMailboxOptions } from "./top-bar";
+import { MailboxDots, MailboxSwitcher, useMailboxOptions } from "./top-bar";
 import { useOtterAccount } from "../otter-account";
 import { useMailboxes } from "../mailboxes";
 import { OtterAvatar } from "../settings/otter-account-pane";
@@ -81,15 +78,6 @@ import type { SettingsPane } from "./api";
 import { UpdateCard } from "../updates";
 import { AddMailboxMenu } from "./add-mailbox";
 import { useCapabilities } from "./capabilities";
-import {
-  projectIdOf,
-  projectLabelId,
-  projectsApi,
-  useProjects,
-  useProjectUnreadCounts,
-  type Project,
-} from "./projects";
-import { requestNewProject } from "./project-menus";
 
 const LABEL_DRAG_MIME = "application/x-gmail-label";
 
@@ -104,7 +92,7 @@ type RowDragProps = {
 };
 
 /** A sidebar row's box (Settings' nav mirrors it). */
-const SIDEBAR_ROW =
+export const SIDEBAR_ROW =
   "group flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg text-left text-sm font-normal outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active";
 
 /** Gmail's labels API only accepts colors from its fixed palette. */
@@ -268,7 +256,7 @@ function AccountMenuItems({
 
 /** Sidebar row (Codex): 14px regular text, muted icon, a rounded pill on hover
     and when selected; counts live in the badge only. */
-function SkRow({
+export function SkRow({
   icon,
   title,
   selected,
@@ -341,7 +329,7 @@ function SkRow({
   );
 }
 
-function Section({
+export function Section({
   title,
   action,
   children,
@@ -395,7 +383,7 @@ function Section({
   );
 }
 
-function SectionAddButton({ label, onClick }: { label: string; onClick: () => void }) {
+export function SectionAddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <HintTooltip label={label}>
       <button
@@ -411,7 +399,7 @@ function SectionAddButton({ label, onClick }: { label: string; onClick: () => vo
 }
 
 /** "+ Add …" footer row for a section. */
-function AddRow({ label, ...props }: { label: string } & ComponentProps<"button">) {
+export function AddRow({ label, ...props }: { label: string } & ComponentProps<"button">) {
   return (
     <button
       type="button"
@@ -645,212 +633,6 @@ function LabelNode({
   );
 }
 
-/** A project's row: selects it; conversations dropped on it join it. */
-function ProjectRow({
-  project,
-  selected,
-  unread,
-  onSelect,
-  onRename,
-  onDelete,
-}: {
-  project: Project;
-  selected: boolean;
-  unread: number;
-  onSelect: () => void;
-  onRename: () => void;
-  onDelete: () => void;
-}) {
-  const [dropActive, setDropActive] = useState(false);
-  const settled = project.status === "settled";
-  const dragProps: RowDragProps = {
-    onDragOver: (e) => {
-      if (!isThreadDrag(e.dataTransfer)) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
-      setDropActive(true);
-    },
-    onDragLeave: () => setDropActive(false),
-    onDrop: (e) => {
-      setDropActive(false);
-      const payload = readThreadDrag(e.dataTransfer);
-      if (!payload) return;
-      e.preventDefault();
-      console.log("[AccountsSidebar:dropOnProject]", { count: payload.threads.length });
-      projectsApi
-        .addThreads(project.id, payload.threads)
-        .then(() =>
-          toast.success(
-            payload.threads.length === 1
-              ? `Added to “${project.name}”`
-              : `Added ${payload.threads.length} conversations to “${project.name}”`,
-          ),
-        )
-        .catch(() => toast.error("Couldn't add to the project"));
-    },
-  };
-  const setStatus = (status: Project["status"]) =>
-    void projectsApi
-      .update(project.id, { status })
-      .catch(() => toast.error("Couldn't change the project"));
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger>
-        <SkRow
-          icon={
-            settled ? (
-              <CircleCheckIcon className="size-4" />
-            ) : selected ? (
-              <FolderOpenIcon className="size-4" />
-            ) : (
-              <FolderIcon className="size-4" />
-            )
-          }
-          title={project.name}
-          selected={selected}
-          badge={settled ? undefined : unread}
-          dragProps={dragProps}
-          dropActive={dropActive}
-          onClick={onSelect}
-        />
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem icon="pencil" onSelect={onRename}>
-          Rename…
-        </ContextMenuItem>
-        {settled ? (
-          <ContextMenuItem onSelect={() => setStatus("active")}>Reopen project</ContextMenuItem>
-        ) : (
-          <ContextMenuItem onSelect={() => setStatus("settled")}>Settle project</ContextMenuItem>
-        )}
-        <ContextMenuSeparator />
-        <ContextMenuItem icon="trash" color="red" onSelect={onDelete}>
-          Delete project…
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-}
-
-const SETTLED_OPEN_KEY = "gmail:projects:settled-open";
-
-/**
- * Projects, every mailbox's: the active ones, then the settled ones on a
- * shelf that stays folded until opened (Otter Code's Settled).
- */
-function ProjectsSection({
-  selectedLabelId,
-  onSelectLabel,
-}: {
-  selectedLabelId: string;
-  onSelectLabel: (labelId: string) => void;
-}) {
-  const projects = useProjects().data ?? [];
-  const unread = useProjectUnreadCounts().data ?? {};
-  const [settledOpen, setSettledOpen] = useState(
-    () => localStorage.getItem(SETTLED_OPEN_KEY) === "1",
-  );
-  const [renameTarget, setRenameTarget] = useState<Project | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
-  const active = projects.filter((p) => p.status === "active");
-  const settled = projects
-    .filter((p) => p.status === "settled")
-    .sort((a, b) => (b.settledAt ?? 0) - (a.settledAt ?? 0));
-  const selectedId = projectIdOf(selectedLabelId);
-
-  const row = (project: Project) => (
-    <ProjectRow
-      key={project.id}
-      project={project}
-      selected={selectedId === project.id}
-      unread={unread[project.id] ?? 0}
-      onSelect={() => {
-        console.log("[AccountsSidebar:selectProject]", { status: project.status });
-        onSelectLabel(projectLabelId(project.id));
-      }}
-      onRename={() => {
-        setRenameValue(project.name);
-        setRenameTarget(project);
-      }}
-      onDelete={() => setDeleteTarget(project)}
-    />
-  );
-
-  return (
-    <Section
-      title="Projects"
-      action={
-        <SectionAddButton label="New project" onClick={() => requestNewProject({ open: true })} />
-      }
-    >
-      {active.map(row)}
-      {settled.length > 0 ? (
-        <>
-          <button
-            type="button"
-            onClick={() =>
-              setSettledOpen((open) => {
-                localStorage.setItem(SETTLED_OPEN_KEY, open ? "0" : "1");
-                return !open;
-              })
-            }
-            aria-expanded={settledOpen}
-            className={`${SIDEBAR_ROW} px-(--sidebar-row-content-inset) text-[13px] text-sidebar-muted-foreground hover:text-sidebar-foreground`}
-          >
-            <ChevronDownIcon
-              className={["size-4 transition-transform", settledOpen ? "" : "-rotate-90"].join(" ")}
-            />
-            <span className="flex-1 truncate">Settled</span>
-            <span className="tabular-nums">{settled.length}</span>
-          </button>
-          {settledOpen ? <div className="opacity-80">{settled.map(row)}</div> : null}
-        </>
-      ) : null}
-
-      <Dialog
-        open={renameTarget != null}
-        onOpenChange={(o) => {
-          if (!o) setRenameTarget(null);
-        }}
-        title="Rename project"
-        confirmLabel="Rename"
-        confirmDisabled={!renameValue.trim()}
-        onConfirm={async () => {
-          if (!renameTarget) return;
-          await projectsApi.update(renameTarget.id, { name: renameValue.trim() });
-          setRenameTarget(null);
-        }}
-      >
-        <Field label="Name" orientation="vertical">
-          <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} autoFocus />
-        </Field>
-      </Dialog>
-
-      <Dialog
-        open={deleteTarget != null}
-        onOpenChange={(o) => {
-          if (!o) setDeleteTarget(null);
-        }}
-        title="Delete project"
-        confirmLabel="Delete"
-        confirmVariant="destructive"
-        onConfirm={async () => {
-          if (!deleteTarget) return;
-          if (selectedId === deleteTarget.id) onSelectLabel("INBOX");
-          await projectsApi.delete(deleteTarget.id);
-          setDeleteTarget(null);
-        }}
-      >
-        <Text variant="small">
-          Delete “{deleteTarget?.name}” on every device? Its conversations stay in your mailboxes;
-          its notes and links go. To keep it, settle it instead.
-        </Text>
-      </Dialog>
-    </Section>
-  );
-}
-
 type AccountsSidebarProps = {
   /** The app's menu: Settings (a pane, General by default) and Sync now. */
   onOpenSettings: (pane?: SettingsPane) => void;
@@ -932,9 +714,7 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
   });
 
   return (
-    <div className="flex h-full min-w-0 flex-col">
-      <WindowTitle />
-
+    <div className="flex h-full min-w-0 flex-col pt-2">
       <div
         ref={scroller}
         // Where there's no scrollend (older Safari), a pause in scrolling stands in.
@@ -1309,8 +1089,6 @@ function SidebarPage({
                   </Fragment>
                 ))}
 
-              <ProjectsSection selectedLabelId={selectedLabelId} onSelectLabel={onSelectLabel} />
-
               <Section
                 title="Views"
                 action={<SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />}
@@ -1352,8 +1130,6 @@ function SidebarPage({
                   </Fragment>
                 );
               })}
-
-              <ProjectsSection selectedLabelId={selectedLabelId} onSelectLabel={onSelectLabel} />
 
               <Section
                 title="Views"
