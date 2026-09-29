@@ -63,16 +63,16 @@ A project keeps the conversations, documents, links and notes of one piece of wo
 a deal) together until it's settled. Projects follow the Otter account; the relay keeps which
 conversations are in one, never their mail.
 
-| Feature                                                              | Mac                 | Web | iPhone |
-| -------------------------------------------------------------------- | ------------------- | --- | ------ |
-| Project tabs above the mailboxes; any project from the Projects menu | ✓                   | ✓   | —      |
-| Add conversations (menu, drag onto a tab), remove them               | ✓                   | ✓   | —      |
-| Conversations from every mailbox, filtered by mailbox                | ✓                   | ✓   | —      |
-| Notes, links                                                         | ✓                   | ✓   | —      |
-| Documents: its conversations' attachments, as versions               | ✓                   | ✓   | —      |
-| Settle, reopen                                                       | ✓                   | ✓   | —      |
-| Synced through the Otter account                                     | ✓ (offline: queued) | ✓   | —      |
-| Uploaded files                                                       | —                   | —   | —      |
+| Feature                                                       | Mac                 | Web | iPhone |
+| ------------------------------------------------------------- | ------------------- | --- | ------ |
+| Projects in the sidebar heading's menu, next to the mailboxes | ✓                   | ✓   | —      |
+| Add conversations from a conversation's menu, remove them     | ✓                   | ✓   | —      |
+| Conversations from every mailbox, filtered by mailbox         | ✓                   | ✓   | —      |
+| Notes, links                                                  | ✓                   | ✓   | —      |
+| Documents: its conversations' attachments, as versions        | ✓                   | ✓   | —      |
+| Settle, reopen                                                | ✓                   | ✓   | —      |
+| Synced through the Otter account                              | ✓ (offline: queued) | ✓   | —      |
+| Uploaded files                                                | —                   | —   | —      |
 
 ## Composing & sending
 

@@ -70,7 +70,7 @@ import { renameLabelKeybindings, useKeybindingsState } from "../keybindings/stor
 import { formatShortcut, parseShortcut } from "../keybindings/keys";
 import { LabelShortcutDialog } from "../settings/keybindings-pane";
 import { UnreadPill, HintTooltip } from "./ui";
-import { MailboxDots, MailboxSwitcher, useMailboxOptions } from "./top-bar";
+import { MailboxDots, MailboxSwitcher, WindowTitle, useMailboxOptions } from "./top-bar";
 import { useOtterAccount } from "../otter-account";
 import { useMailboxes } from "../mailboxes";
 import { OtterAvatar } from "../settings/otter-account-pane";
@@ -208,7 +208,7 @@ function SearchRow({
  * Sign in), Settings, and Sync now (only while push isn't live, as before;
  * ⌘, and ⌘R work either way).
  */
-function AccountMenuItems({
+export function AccountMenuItems({
   onOpenSettings,
   onSync,
   syncing,
@@ -655,6 +655,8 @@ type AccountsSidebarProps = {
   searches: SidebarSearch[];
   onSelectSearch: (id: string) => void;
   onCloseSearch: (id: string) => void;
+  /** Opens a project (from the heading's menu). */
+  onSelectProject: (projectId: string) => void;
 };
 
 /**
@@ -714,7 +716,9 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
   });
 
   return (
-    <div className="flex h-full min-w-0 flex-col pt-2">
+    <div className="flex h-full min-w-0 flex-col">
+      <WindowTitle />
+
       <div
         ref={scroller}
         // Where there's no scrollend (older Safari), a pause in scrolling stands in.
@@ -781,6 +785,7 @@ function SidebarPage({
   searches,
   onSelectSearch,
   onCloseSearch,
+  onSelectProject,
 }: AccountsSidebarProps & {
   /** The page showing; a neighbor drawn during a swipe is inert. */
   active: boolean;
@@ -1037,6 +1042,7 @@ function SidebarPage({
             accounts={accounts}
             selectedAccountId={selectedAccountId}
             onSelectAccount={onSelectAccount}
+            onSelectProject={onSelectProject}
           >
             <AccountMenuItems onOpenSettings={onOpenSettings} onSync={onSync} syncing={syncing} />
           </MailboxSwitcher>
