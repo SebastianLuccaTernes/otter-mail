@@ -1,9 +1,9 @@
 import type { GmailMessageSummary } from "./types";
 
 /**
- * Pointer-sized mail context for the assistant chat. The agent has gog
- * access to the same mailboxes, so ids are enough — no mail content leaves
- * the app.
+ * Pointer-sized mail context for the assistant chat. The agent reads the
+ * same mailboxes with its own tools, so ids are enough — no mail content
+ * leaves the app.
  */
 export type AssistantContext = {
   /** Owning account email per conversation (falls back to account id). */
@@ -16,6 +16,8 @@ export type AssistantContext = {
     /** Present when the item is a highlighted excerpt, not the whole thread. */
     quote?: string;
   }[];
+  /** The project on screen, if any. */
+  project?: { id: string; name: string };
 };
 
 /** A text excerpt selected from a message, plus its thread pointer. */
@@ -63,6 +65,9 @@ export function contextFromQuote(q: QuoteContext): AssistantContext {
 /** Question + pointer block sent with a chat turn. */
 export function buildHandoffText(question: string, context: AssistantContext): string {
   const lines: string[] = [question.trim(), "", "— context from Otter Mail —"];
+  if (context.project) {
+    lines.push(`• Project “${context.project.name}” (projectId ${context.project.id})`);
+  }
   for (const c of context.conversations) {
     if (c.quote) {
       lines.push(
@@ -74,6 +79,6 @@ export function buildHandoffText(question: string, context: AssistantContext): s
       );
     }
   }
-  lines.push("Fetch full content with gog if needed.");
+  lines.push("Read them with your mail tools if needed.");
   return lines.join("\n");
 }

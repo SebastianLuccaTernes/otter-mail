@@ -40,6 +40,7 @@ import {
   withAttachmentPaths,
 } from "./local.js";
 import { ASSISTANT_INSTRUCTIONS } from "./instructions.js";
+import { MCP_SERVER_NAME, mcpServer, readOnlyToolNames } from "./mcp.js";
 import { ensureShellPath } from "./shell-path.js";
 import type {
   ApprovalDecision,
@@ -463,6 +464,7 @@ async function openSession(
 
   const effort = settings.reasoningEffort as EffortLevel | "";
   const pm = permissionMode(mode);
+  const mail = await mcpServer();
   const options: ClaudeOptions = {
     cwd,
     pathToClaudeCodeExecutable: claudeBinary(settings),
@@ -473,6 +475,15 @@ async function openSession(
       append: ASSISTANT_INSTRUCTIONS,
     },
     settingSources: ["user", "project", "local"],
+    // Otter Mail's own tools (mcp.ts); the ones that only read need no approval.
+    mcpServers: {
+      [MCP_SERVER_NAME]: {
+        type: "http",
+        url: mail.url,
+        headers: { Authorization: `Bearer ${mail.token}` },
+      },
+    },
+    allowedTools: readOnlyToolNames().map((name) => `mcp__${MCP_SERVER_NAME}__${name}`),
     ...(settings.model ? { model: settings.model } : {}),
     ...(effort ? { effort } : {}),
     ...(settings.serviceTier === "fast" ? { settings: { fastMode: true } } : {}),

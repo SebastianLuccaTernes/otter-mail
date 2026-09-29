@@ -57,6 +57,23 @@ Swift code (`apps/ios`). Gmail and IMAP are noted where they differ.
 | After archive: next / previous           | ✓                        | ✓            | ✓              |
 | Snooze                                   | —                        | —            | —              |
 
+## Projects
+
+A project keeps the conversations, documents, links and notes of one piece of work (a contract,
+a deal) together until it's settled. Projects follow the Otter account; the relay keeps which
+conversations are in one, never their mail.
+
+| Feature                                                    | Mac                 | Web | iPhone |
+| ---------------------------------------------------------- | ------------------- | --- | ------ |
+| Projects in the sidebar, settled ones on a folded shelf    | ✓                   | ✓   | —      |
+| Add conversations (menu, drag onto a project), remove them | ✓                   | ✓   | —      |
+| Conversations from every mailbox in one list               | ✓                   | ✓   | —      |
+| Notes, links                                               | ✓                   | ✓   | —      |
+| Documents: its conversations' attachments, as versions     | ✓                   | ✓   | —      |
+| Settle, reopen                                             | ✓                   | ✓   | —      |
+| Synced through the Otter account                           | ✓ (offline: queued) | ✓   | —      |
+| Uploaded files                                             | —                   | —   | —      |
+
 ## Composing & sending
 
 | Feature                                | Mac                                            | Web | iPhone                   |
@@ -135,6 +152,8 @@ Swift code (`apps/ios`). Gmail and IMAP are noted where they differ.
 | Chat about a conversation (pointers, not mail)     | ✓ (also selections, quotes) | ✓                          | ✓ (a thread) |
 | Attach images and files to a chat                  | ✓                           | ✓                          | —            |
 | Queued follow-ups                                  | ✓                           | ✓                          | —            |
+| Otter Mail's tools (MCP): mail, drafts, projects   | Claude, Codex               | —                          | —            |
+| Projects for agents elsewhere (relay MCP, token)   | ✓ (Hermes)                  | ✓ (Hermes)                 | ✓ (Hermes)   |
 
 ## Translation
 

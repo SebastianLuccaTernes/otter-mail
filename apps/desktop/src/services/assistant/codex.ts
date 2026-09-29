@@ -19,6 +19,7 @@ import {
 import { dataUrl } from "@otter-mail/core";
 import { assistantWorkspace, withAttachmentPaths } from "./local.js";
 import { ASSISTANT_INSTRUCTIONS } from "./instructions.js";
+import { MCP_SERVER_NAME, mcpServer } from "./mcp.js";
 import type {
   ChatProvider,
   ChatSession,
@@ -174,8 +175,25 @@ function armIdle(session: Session): void {
   }, SESSION_IDLE_MS);
 }
 
+/**
+ * An MCP server's form that asks for nothing but a yes: how Codex asks
+ * before calling a tool that isn't read-only (Otter Mail's own, among them).
+ */
+function isToolApproval(request: ServerRequest): boolean {
+  if (request.method !== "mcpServer/elicitation/request") return false;
+  const p = request.params;
+  const schema = p.requestedSchema as { properties?: Record<string, unknown> } | undefined;
+  return p.mode === "form" && Object.keys(schema?.properties ?? {}).length === 0;
+}
+
 /** Codex's answer for an approval request, per T3's decision mapping. */
 function approvalResponse(request: ServerRequest, decision: ApprovalDecision | "cancel"): unknown {
+  if (request.method === "mcpServer/elicitation/request") {
+    const granted = decision === "once" || decision === "session" || decision === "always";
+    return granted
+      ? { action: "accept", content: {} }
+      : { action: decision === "cancel" ? "cancel" : "decline" };
+  }
   if (request.method === "item/permissions/requestApproval") {
     const granted = decision === "once" || decision === "session" || decision === "always";
     return {
@@ -256,6 +274,24 @@ function toApproval(request: ServerRequest): ApprovalRequest | null {
         reason,
         choices,
       };
+    case "mcpServer/elicitation/request": {
+      if (!isToolApproval(request)) return null;
+      // Codex names the tool and its arguments in `_meta`.
+      const meta = p._meta as
+        | { tool_params_display?: { display_name?: string; value?: unknown }[] }
+        | undefined;
+      const args = (meta?.tool_params_display ?? []).map(
+        (arg) =>
+          `${arg.display_name}: ${typeof arg.value === "string" ? arg.value : JSON.stringify(arg.value)}`,
+      );
+      return {
+        id,
+        kind: "tool",
+        title: "Tool approval",
+        detail: [String(p.message ?? p.serverName ?? ""), ...args].join("\n").slice(0, 1200),
+        choices: ["once", "deny"],
+      };
+    }
     default:
       return null;
   }
@@ -392,8 +428,14 @@ async function openSession(
 
   const cwd = await assistantWorkspace();
   const server = await CodexAppServer.start(settings, cwd);
+  const mail = await mcpServer();
   const params = {
     cwd,
+    // Otter Mail's own tools (mcp.ts), next to the user's MCP servers.
+    config: {
+      [`mcp_servers.${MCP_SERVER_NAME}.url`]: mail.url,
+      [`mcp_servers.${MCP_SERVER_NAME}.http_headers`]: { Authorization: `Bearer ${mail.token}` },
+    },
     ...threadConfig(settings),
     ...(settings.model ? { model: settings.model } : {}),
     developerInstructions: ASSISTANT_INSTRUCTIONS,

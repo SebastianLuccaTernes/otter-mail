@@ -9,6 +9,7 @@ import { registerCalendarHandlers } from "./handlers/calendar.js";
 import { registerGmailHandlers } from "./handlers/gmail.js";
 import { registerImapAccountHandlers } from "./handlers/imap-accounts.js";
 import { registerOtterAccountHandlers } from "./handlers/otter-account.js";
+import { registerProjectHandlers } from "./handlers/projects.js";
 import { registerSearchHandlers } from "./handlers/search.js";
 import { registerTranslationHandlers } from "./handlers/translation.js";
 import { broadcast, handle } from "./ipc.js";
@@ -40,6 +41,7 @@ export async function startCore(platform: Platform): Promise<void> {
   registerOtterAccountHandlers();
   registerTranslationHandlers();
   registerAssistantHandlers();
+  registerProjectHandlers();
   handle("keybindings:read", async () => readKeybindings());
   handle("preferences:getUi", async () => getUiPreferences());
   handle("preferences:setUi", async (params: unknown) => {
@@ -71,6 +73,7 @@ export { logger } from "./logger.js";
 export type * from "./platform.js";
 export * as accountStore from "./services/account-store.js";
 export * as mailStore from "./services/mail-store.js";
+export { localBackend as projectsBackend } from "./services/projects.js";
 export { runAsTask } from "./handlers/ipc-budget.js";
 export { ATTACHMENTS_DIR, dataUrl, readAttachment } from "./services/assistant/attachments.js";
 export { shutdownProviders } from "./services/assistant/service.js";
