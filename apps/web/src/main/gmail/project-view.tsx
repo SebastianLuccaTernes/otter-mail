@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BotMessageSquareIcon,
+  EllipsisIcon,
   ChevronRightIcon,
   CircleCheckIcon,
   FileTextIcon,
@@ -18,6 +19,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
+import { Dialog } from "~/components/ui/dialog";
+import { Text } from "~/components/ui/text";
 import { Input } from "~/components/ui/input";
 import { gmailApi } from "./api";
 import { useAccounts } from "./hooks";
@@ -29,6 +32,7 @@ import {
   type Project,
   type ProjectDocument,
 } from "./projects";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./menu";
 import { toast } from "./toast";
 import { cn } from "./ui";
 
@@ -306,11 +310,15 @@ export function ProjectView({
   project,
   onOpenMessage,
   onAskAssistant,
+  onDeleted,
 }: {
   project: Project;
   onOpenMessage: (accountId: string, messageId: string) => void;
   onAskAssistant: () => void;
+  /** The project was deleted: go somewhere else. */
+  onDeleted: () => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const accounts = useAccounts().data ?? [];
   const accountOf = (email: string) => accounts.find((a) => a.email.toLowerCase() === email);
   const documents = useProjectDocuments(project.id, project.threads.length);
@@ -375,7 +383,36 @@ export function ProjectView({
               Settle
             </Button>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" aria-label="More">
+                <EllipsisIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem color="red" onSelect={() => setConfirmDelete(true)}>
+                Delete project…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+
+        <Dialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          title="Delete project"
+          confirmLabel="Delete"
+          confirmVariant="destructive"
+          onConfirm={async () => {
+            await projectsApi.delete(project.id);
+            onDeleted();
+          }}
+        >
+          <Text variant="small">
+            Delete “{project.name}” on every device? Its conversations stay in your mailboxes; its
+            notes and links go. To keep it, settle it instead.
+          </Text>
+        </Dialog>
 
         <Heading>Notes</Heading>
         <Notes key={project.id} project={project} />
