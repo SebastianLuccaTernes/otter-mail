@@ -14,6 +14,7 @@ import * as NodeChildProcess from "node:child_process";
 import * as NodeCrypto from "node:crypto";
 import * as NodeFS from "node:fs";
 import * as NodeNet from "node:net";
+import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeReadline from "node:readline";
 import { parseArgs } from "node:util";
@@ -46,6 +47,8 @@ Options:
   --home <dir>    Data home of the Mac app. Default: a linked worktree's own
                   .otter-mail, otherwise ~/.otter-mail/dev (never the installed
                   app's ~/.otter-mail/userdata).
+  --demo          dev:desktop only: the Mac app on the demo mailbox, as dev:demo
+                  (no Google or Otter account), in the data home's demo/.
   --dry-run       Print the resolved ports and commands, then exit.
   -h, --help      Show this help.
 
@@ -150,6 +153,7 @@ async function main(): Promise<void> {
     allowPositionals: true,
     options: {
       home: { type: "string" },
+      demo: { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -228,7 +232,12 @@ async function main(): Promise<void> {
     );
   }
 
-  const dataHome = resolveDevHome({ cwd: repoRoot, explicitHome: values.home });
+  const devHome = resolveDevHome({ cwd: repoRoot, explicitHome: values.home });
+  // The demo keeps its own state, apart from the mailboxes signed in to the dev app.
+  const demo = desktop && values.demo;
+  const dataHome = demo
+    ? NodePath.join(devHome ?? NodePath.join(NodeOS.homedir(), ".otter-mail", "dev"), "demo")
+    : devHome;
   const configuredDebugPort = process.env.OTTER_MAIL_REMOTE_DEBUGGING_PORT?.trim();
   const debugPort = !desktop
     ? 0
@@ -239,6 +248,7 @@ async function main(): Promise<void> {
         : await findFreePort(port + 1000);
   console.log(`[dev] ${devServerUrl} (${portSource})`);
   if (mode === "dev:demo") console.log("[dev] Demo mailbox (?reset-demo starts it over)");
+  if (demo) console.log("[dev] Demo mailbox (delete the data folder to start it over)");
   if (mode === "dev") console.log(`[dev] Relay: ${relayUrl}`);
   if (desktop) {
     console.log(
@@ -279,6 +289,7 @@ async function main(): Promise<void> {
     VITE_DEV_SERVER_URL: devServerUrl,
     ...(mode === "dev" ? { VITE_RELAY_URL: relayUrl } : {}),
     ...(mode === "dev:demo" ? { VITE_DEMO: "1" } : {}),
+    ...(demo ? { OTTER_MAIL_DEMO: "1" } : {}),
     ...(trustDevMail
       ? {
           VITE_DEV_MAIL_CA: NodeFS.readFileSync(devMailCa, "utf8"),

@@ -133,5 +133,10 @@ and trash, and plenty of non-ASCII names. Use it to build and test without your 
   to start over (close other demo tabs first).
 - Real builds leave all of it out: `__DEMO__` is `false` unless `VITE_DEMO=1`.
 
+`pnpm dev:desktop --demo` runs the Mac app on the same pretend Gmail, for what only the Mac has
+(Codex, Claude, Apple Intelligence, the menu-bar popover). Its state lives in the data home's
+`demo/` folder; delete that folder to start over. The desktop's `__DEMO__` is `false` unless
+`OTTER_MAIL_DEMO=1`, which the flag sets.
+
 `pnpm --filter @otter-mail/site build` assembles the deployable site (landing pages plus the
 app) in `site/dist`.

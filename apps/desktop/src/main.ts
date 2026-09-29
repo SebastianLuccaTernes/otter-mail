@@ -20,6 +20,8 @@ import { setSettingsTarget } from "./windows/settings-window.js";
 import { createMainWindow, focusMainWindow, getMainWindow } from "./windows/main-window.js";
 import { handleRendererProtocol, registerRendererScheme } from "./windows/window-paths.js";
 
+declare const __DEMO__: boolean;
+
 // Each kind of run has its own data home; see paths.ts.
 configureAppPaths();
 
@@ -296,6 +298,12 @@ void app.whenReady().then(async () => {
 
   // The mail backend (@otter-mail/core) runs in this process.
   const platform = desktopPlatform();
+  // `pnpm dev:desktop --demo`: the web demo's pretend Gmail and seeded mailboxes.
+  if (__DEMO__) {
+    const demo = await import("../../web/src/web/demo/gmail.ts");
+    await demo.installFakeGmail(platform.files);
+    Object.assign(platform, { google: demo.demoGoogleAuth(), relayUrl: demo.DEMO_RELAY_URL });
+  }
   await migrateHermesKey(platform.secrets);
   await startCore(platform);
   registerHandlers();

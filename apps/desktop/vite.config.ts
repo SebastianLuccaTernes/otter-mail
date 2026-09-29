@@ -37,6 +37,8 @@ const shared = {
     __APP_VERSION__: JSON.stringify(process.env.OTTER_MAIL_VERSION?.trim() || pkg.version),
     __GOOGLE_CLIENT_ID__: JSON.stringify(buildEnv("OTTER_MAIL_GOOGLE_CLIENT_ID")),
     __GOOGLE_CLIENT_SECRET__: JSON.stringify(buildEnv("OTTER_MAIL_GOOGLE_CLIENT_SECRET")),
+    // `pnpm dev:desktop --demo`; false (and the demo left out) in every other build.
+    __DEMO__: JSON.stringify(process.env.OTTER_MAIL_DEMO === "1"),
   },
   deps: {
     alwaysBundle: (id: string) => !id.startsWith("node:") && !isExternal(id),
