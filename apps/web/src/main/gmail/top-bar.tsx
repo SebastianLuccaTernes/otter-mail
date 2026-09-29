@@ -2,10 +2,6 @@ import type { ReactNode } from "react";
 import { DropdownMenu as RadixMenu } from "radix-ui";
 import {
   ChevronDownIcon,
-  ChevronRightIcon,
-  CircleCheckIcon,
-  FolderIcon,
-  PlusIcon,
   LayersIcon,
   PanelLeftCloseIcon,
   PanelLeftIcon,
@@ -20,8 +16,6 @@ import type { GmailAccount } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 import { useMailboxArrangement } from "../mailboxes";
-import { useProjectUnreadCounts, useProjects, type Project } from "./projects";
-import { requestNewProject } from "./project-menus";
 
 /**
  * Every column owns the slice of the title band above it, so the pane
@@ -221,68 +215,30 @@ export function MailboxDots({
  * Mailbox switcher, the sidebar's heading; aligned with the rows below it.
  * `children` are more items after the mailboxes (the sidebar's app menu).
  */
-const SWITCHER_ITEM =
-  "flex min-h-8 cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1 text-sm outline-none data-[highlighted]:bg-accent-surface data-[highlighted]:text-foreground data-[state=open]:bg-accent-surface";
-
-/**
- * The sidebar's heading: where you are (a mailbox, or a project, which spans
- * them) and the menu that goes anywhere else: the mailboxes, then the
- * projects, then the app's own items.
- */
 export function MailboxSwitcher({
   accounts,
   selectedAccountId,
   onSelectAccount,
-  project,
-  onSelectProject,
   className,
   children,
 }: {
   accounts: GmailAccount[];
   selectedAccountId: string | null;
   onSelectAccount: (accountId: string) => void;
-  /** The project showing, in place of a mailbox. */
-  project?: Project | null;
-  /** Lists the projects too (the main window, not the menu-bar popover). */
-  onSelectProject?: (projectId: string) => void;
   className?: string;
   children?: ReactNode;
 }) {
   const options = useMailboxOptions(accounts);
   const unread = useInboxUnread(accounts);
-  const projects = useProjects().data ?? [];
-  const projectUnread = useProjectUnreadCounts().data ?? {};
-  const active = projects.filter((p) => p.status === "active");
-  const settled = projects
-    .filter((p) => p.status === "settled")
-    .sort((a, b) => (b.settledAt ?? 0) - (a.settledAt ?? 0));
-  const isCombined = !project && selectedAccountId === COMBINED_ACCOUNT_ID;
-  const selectedAccount =
-    project || isCombined ? null : (accounts.find((a) => a.id === selectedAccountId) ?? null);
-  const mailboxName = project
-    ? project.name
-    : isCombined
-      ? "All mailboxes"
-      : selectedAccount
-        ? getAccountDisplayName(selectedAccount)
-        : "Mailbox";
-  const projectItem = (p: Project) => (
-    <RadixMenu.Item
-      key={p.id}
-      onSelect={() => onSelectProject?.(p.id)}
-      className={cn(SWITCHER_ITEM, project?.id === p.id && "bg-foreground/[0.08]")}
-    >
-      <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
-        {p.status === "settled" ? (
-          <CircleCheckIcon className="size-4" />
-        ) : (
-          <FolderIcon className="size-4" />
-        )}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{p.name}</span>
-      {p.status === "active" ? <UnreadPill count={projectUnread[p.id] ?? 0} /> : null}
-    </RadixMenu.Item>
-  );
+  const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
+  const selectedAccount = isCombined
+    ? null
+    : (accounts.find((a) => a.id === selectedAccountId) ?? null);
+  const mailboxName = isCombined
+    ? "All mailboxes"
+    : selectedAccount
+      ? getAccountDisplayName(selectedAccount)
+      : "Mailbox";
   return (
     <RadixMenu.Root>
       <RadixMenu.Trigger asChild>
@@ -295,11 +251,7 @@ export function MailboxSwitcher({
           )}
         >
           <span className="flex size-4 shrink-0 items-center justify-center">
-            {project ? (
-              <FolderIcon className="size-4 text-sidebar-muted-foreground" aria-hidden />
-            ) : (
-              <MailboxMark account={selectedAccount} className="text-sidebar-muted-foreground" />
-            )}
+            <MailboxMark account={selectedAccount} className="text-sidebar-muted-foreground" />
           </span>
           {/* A heading, like Codex's "Codex ⌄": the name, then its chevron. */}
           <span className="min-w-0 truncate text-base font-semibold tracking-tight">
@@ -319,7 +271,7 @@ export function MailboxSwitcher({
           className="dropdown-glass z-[130] w-(--radix-dropdown-menu-trigger-width) min-w-52 rounded-lg p-1 text-foreground shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] outline-none dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]"
         >
           {options.map((option) => {
-            const selected = !project && option.id === (selectedAccountId ?? "");
+            const selected = option.id === (selectedAccountId ?? "");
             return (
               <RadixMenu.Item
                 key={option.id}
@@ -340,44 +292,6 @@ export function MailboxSwitcher({
               </RadixMenu.Item>
             );
           })}
-          {onSelectProject ? (
-            <>
-              <DropdownMenuSeparator className="bg-foreground/15" />
-              <div className="px-2 pb-1 pt-1.5 text-[13px] text-muted-foreground">Projects</div>
-              {active.map(projectItem)}
-              {settled.length > 0 ? (
-                <RadixMenu.Sub>
-                  <RadixMenu.SubTrigger className={SWITCHER_ITEM}>
-                    <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
-                      <CircleCheckIcon className="size-4" />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">Settled</span>
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {settled.length}
-                    </span>
-                    <ChevronRightIcon className="size-3.5 text-muted-foreground" />
-                  </RadixMenu.SubTrigger>
-                  <RadixMenu.Portal>
-                    <RadixMenu.SubContent
-                      sideOffset={4}
-                      className="dropdown-glass z-[130] max-h-[60vh] min-w-52 overflow-y-auto rounded-lg p-1 text-foreground shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] outline-none dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]"
-                    >
-                      {settled.map(projectItem)}
-                    </RadixMenu.SubContent>
-                  </RadixMenu.Portal>
-                </RadixMenu.Sub>
-              ) : null}
-              <RadixMenu.Item
-                onSelect={() => requestNewProject({ open: true })}
-                className={SWITCHER_ITEM}
-              >
-                <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
-                  <PlusIcon className="size-4" />
-                </span>
-                <span className="min-w-0 flex-1 truncate">New project…</span>
-              </RadixMenu.Item>
-            </>
-          ) : null}
           {children ? (
             <>
               <DropdownMenuSeparator className="bg-foreground/15" />

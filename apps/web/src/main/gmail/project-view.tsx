@@ -1,7 +1,8 @@
 /**
  * A project's page, in the main pane while none of its conversations is
- * open: where it stands (its notes), its documents (its conversations'
- * attachments, with their versions), its links, and settling it. The
+ * open (Linear's issue page): where it stands (its notes) and its documents
+ * (its conversations' attachments, with their versions), then a column of
+ * its properties: status, the mailboxes it spans, its links. The
  * conversations themselves are the list next to it.
  */
 
@@ -11,10 +12,12 @@ import {
   EllipsisIcon,
   ChevronRightIcon,
   CircleCheckIcon,
+  CircleDashedIcon,
   FileTextIcon,
   LinkIcon,
   PlusIcon,
   RotateCcwIcon,
+  StarIcon,
   XIcon,
 } from "lucide-react";
 
@@ -23,10 +26,12 @@ import { Dialog } from "~/components/ui/dialog";
 import { Text } from "~/components/ui/text";
 import { Input } from "~/components/ui/input";
 import { gmailApi } from "./api";
+import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { useAccounts } from "./hooks";
 import {
   formatSize,
   projectsApi,
+  useFavoriteProjects,
   useProjectDocuments,
   useProjectThreads,
   type Project,
@@ -34,7 +39,7 @@ import {
 } from "./projects";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./menu";
 import { toast } from "./toast";
-import { cn } from "./ui";
+import { HintTooltip, IconBtn, cn } from "./ui";
 
 const date = (ms: number) =>
   new Date(ms).toLocaleDateString([], {
@@ -213,6 +218,19 @@ function DocumentRow({
   );
 }
 
+/** A property of the project, in the column beside its page. */
+function Property({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mb-5">
+      <h3 className="mb-1.5 text-[13px] text-muted-foreground">{label}</h3>
+      {children}
+    </div>
+  );
+}
+
+const SIDE_ROW =
+  "group flex min-h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-sm text-foreground outline-none hover:bg-accent-surface/70 focus-visible:ring-2 focus-visible:ring-focus-ring";
+
 function Links({ project }: { project: Project }) {
   const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
@@ -228,81 +246,68 @@ function Links({ project }: { project: Project }) {
     }
   };
   return (
-    <>
-      <Heading
-        trailing={
-          <Button size="small" variant="ghost" onClick={() => setAdding(true)}>
-            <PlusIcon />
-            Add link
-          </Button>
-        }
-      >
-        Links
-      </Heading>
-      {adding ? (
-        <form
-          className="mb-2 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void add();
-          }}
-        >
-          <Input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
+    <Property label="Links">
+      <div className="-mx-1.5">
+        {project.links.map((link) => (
+          <div
+            key={link.id}
+            role="button"
+            tabIndex={0}
+            title={link.url}
+            onClick={() => void window.desktopBridge.openExternal(link.url)}
+            className={SIDE_ROW}
+          >
+            <LinkIcon className="size-3.5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate">{link.title}</span>
+            <button
+              type="button"
+              aria-label={`Remove ${link.title}`}
+              onClick={(e) => {
                 e.stopPropagation();
-                setAdding(false);
-              }
-            }}
-            placeholder="https://docs.google.com/…"
-            autoFocus
-          />
-          <Button type="submit" variant="accent" disabled={!url.trim()}>
-            Add
-          </Button>
-        </form>
-      ) : null}
-      {project.links.length > 0 ? (
-        <div className={CARD}>
-          {project.links.map((link) => (
-            <div
-              key={link.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => void window.desktopBridge.openExternal(link.url)}
-              className={ROW}
+                void projectsApi.removeLink(project.id, link.id);
+              }}
+              className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
             >
-              <LinkIcon className="size-4 shrink-0 text-muted-foreground" />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm text-foreground">{link.title}</span>
-                {link.title !== link.url ? (
-                  <span className="truncate text-xs text-muted-foreground">
-                    {URL.canParse(link.url) ? new URL(link.url).host : link.url}
-                  </span>
-                ) : null}
-              </span>
-              <button
-                type="button"
-                aria-label={`Remove ${link.title}`}
-                onClick={(e) => {
+              <XIcon className="size-3" />
+            </button>
+          </div>
+        ))}
+        {adding ? (
+          <form
+            className="px-1.5 pt-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void add();
+            }}
+          >
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onBlur={() => {
+                if (!url.trim()) setAdding(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
                   e.stopPropagation();
-                  void projectsApi.removeLink(project.id, link.id);
-                }}
-                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 hover:bg-accent-surface hover:text-foreground group-hover:opacity-100"
-              >
-                <XIcon className="size-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : adding ? null : (
-        <p className="text-sm text-muted-foreground">
-          Shared documents, a signing page, a data room: anything that isn't an email.
-        </p>
-      )}
-    </>
+                  setAdding(false);
+                }
+              }}
+              placeholder="Paste a link, Enter"
+              autoFocus
+            />
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className={cn(SIDE_ROW, "text-muted-foreground hover:text-foreground")}
+          >
+            <PlusIcon className="size-3.5 shrink-0" />
+            Add link
+          </button>
+        )}
+      </div>
+    </Property>
   );
 }
 
@@ -320,10 +325,18 @@ export function ProjectView({
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const accounts = useAccounts().data ?? [];
+  const favorites = useFavoriteProjects();
+  const favorite = favorites.isFavorite(project.id);
   const accountOf = (email: string) => accounts.find((a) => a.email.toLowerCase() === email);
   const documents = useProjectDocuments(project.id, project.threads.length);
   const missing = useProjectThreads(project.id).data?.pages[0]?.missing ?? [];
   const settled = project.status === "settled";
+  // Which mailboxes its conversations are in, and how many in each.
+  const mailboxes = [...new Set(project.threads.map((t) => t.email))].map((email) => ({
+    email,
+    account: accountOf(email),
+    count: project.threads.filter((t) => t.email === email).length,
+  }));
 
   const openVersion = (version: ProjectDocument["versions"][number]) => {
     const account = accountOf(version.email);
@@ -355,104 +368,145 @@ export function ProjectView({
   };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-2xl px-8 pb-16 pt-6">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <ProjectName key={project.id} project={project} />
-            <p className="mt-1 text-sm text-muted-foreground">
-              {settled && project.settledAt
-                ? `Settled ${date(project.settledAt)}`
-                : `Started ${date(project.createdAt)}`}
-              {" · "}
-              {project.threads.length} conversation{project.threads.length === 1 ? "" : "s"}
-            </p>
+    <div className="@container min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-8 pb-16 pt-6 @min-[44rem]:flex-row @min-[44rem]:gap-12">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <ProjectName key={project.id} project={project} />
+            </div>
+            <HintTooltip label={favorite ? "Remove from Favorites" : "Add to Favorites"}>
+              <IconBtn
+                label={favorite ? "Remove from Favorites" : "Add to Favorites"}
+                active={favorite}
+                onClick={() => favorites.toggle(project.id)}
+              >
+                <StarIcon className={cn("size-4", favorite && "fill-current")} />
+              </IconBtn>
+            </HintTooltip>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <IconBtn label="More">
+                  <EllipsisIcon className="size-4" />
+                </IconBtn>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem icon={<BotMessageSquareIcon />} onSelect={onAskAssistant}>
+                  Ask the assistant
+                </DropdownMenuItem>
+                <DropdownMenuItem color="red" onSelect={() => setConfirmDelete(true)}>
+                  Delete project…
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <Button variant="ghost" onClick={onAskAssistant}>
-            <BotMessageSquareIcon />
-            Ask
-          </Button>
-          {settled ? (
-            <Button onClick={() => setStatus("active")}>
-              <RotateCcwIcon />
-              Reopen
-            </Button>
+
+          <Heading>Notes</Heading>
+          <Notes key={project.id} project={project} />
+
+          <Heading>Documents</Heading>
+          {documents.data && documents.data.length > 0 ? (
+            <div className={CARD}>
+              {documents.data.map((doc) => (
+                <DocumentRow
+                  key={`${doc.versions[0].messageId}:${doc.versions[0].attachmentId}`}
+                  doc={doc}
+                  open={openVersion}
+                  onOpenMessage={(version) => {
+                    const account = accountOf(version.email);
+                    if (account) onOpenMessage(account.id, version.messageId);
+                  }}
+                />
+              ))}
+            </div>
           ) : (
-            <Button onClick={() => setStatus("settled")}>
-              <CircleCheckIcon />
-              Settle
-            </Button>
+            <p className="text-sm text-muted-foreground">
+              {documents.isLoading
+                ? "Gathering the attachments…"
+                : documents.isError
+                  ? "Couldn't gather the attachments."
+                  : "The attachments of its conversations show here, versions together."}
+            </p>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" aria-label="More">
-                <EllipsisIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem color="red" onSelect={() => setConfirmDelete(true)}>
-                Delete project…
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+
+          {missing.length > 0 ? (
+            <p className="mt-8 text-[13px] text-muted-foreground">
+              {missing.length === 1
+                ? "1 conversation isn't on this device"
+                : `${missing.length} conversations aren't on this device`}
+              {`: ${missing.map((t) => t.subject || t.email).join(", ")}.`}
+            </p>
+          ) : null}
         </div>
 
-        <Dialog
-          open={confirmDelete}
-          onOpenChange={setConfirmDelete}
-          title="Delete project"
-          confirmLabel="Delete"
-          confirmVariant="destructive"
-          onConfirm={async () => {
-            await projectsApi.delete(project.id);
-            onDeleted();
-          }}
-        >
-          <Text variant="small">
-            Delete “{project.name}” on every device? Its conversations stay in your mailboxes; its
-            notes and links go. To keep it, settle it instead.
-          </Text>
-        </Dialog>
+        <aside className="w-full shrink-0 @min-[44rem]:w-56 @min-[44rem]:pt-2">
+          <Property label="Status">
+            <div className="flex items-center gap-2 text-sm text-foreground">
+              {settled ? (
+                <CircleCheckIcon className="size-4 text-muted-foreground" />
+              ) : (
+                <CircleDashedIcon className="size-4 text-muted-foreground" />
+              )}
+              {settled && project.settledAt ? `Settled ${date(project.settledAt)}` : "Active"}
+            </div>
+            <Button
+              size="small"
+              className="mt-2"
+              onClick={() => setStatus(settled ? "active" : "settled")}
+            >
+              {settled ? <RotateCcwIcon /> : <CircleCheckIcon />}
+              {settled ? "Reopen" : "Settle"}
+            </Button>
+          </Property>
 
-        <Heading>Notes</Heading>
-        <Notes key={project.id} project={project} />
+          <Property label="Started">
+            <span className="text-sm text-foreground">{date(project.createdAt)}</span>
+          </Property>
 
-        <Heading>Documents</Heading>
-        {documents.data && documents.data.length > 0 ? (
-          <div className={CARD}>
-            {documents.data.map((doc) => (
-              <DocumentRow
-                key={`${doc.versions[0].messageId}:${doc.versions[0].attachmentId}`}
-                doc={doc}
-                open={openVersion}
-                onOpenMessage={(version) => {
-                  const account = accountOf(version.email);
-                  if (account) onOpenMessage(account.id, version.messageId);
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {documents.isLoading
-              ? "Gathering the attachments…"
-              : documents.isError
-                ? "Couldn't gather the attachments."
-                : "The attachments of its conversations show here, versions together."}
-          </p>
-        )}
+          <Property label="Mailboxes">
+            {mailboxes.length === 0 ? (
+              <span className="text-sm text-muted-foreground">No conversations yet</span>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {mailboxes.map(({ email, account, count }) => (
+                  <div key={email} className="flex items-center gap-2 text-sm text-foreground">
+                    <span
+                      aria-hidden
+                      className="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-bold leading-none text-white"
+                      style={{ background: account ? getAccountColor(account) : "gray" }}
+                    >
+                      {((account ? getAccountDisplayName(account) : email)[0] ?? "?").toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {account ? getAccountDisplayName(account) : email}
+                    </span>
+                    <span className="text-xs tabular-nums text-muted-foreground">{count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Property>
 
-        <Links project={project} />
-
-        {missing.length > 0 ? (
-          <p className="mt-8 text-[13px] text-muted-foreground">
-            {missing.length === 1
-              ? "1 conversation isn't on this device"
-              : `${missing.length} conversations aren't on this device`}
-            {`: ${missing.map((t) => t.subject || t.email).join(", ")}.`}
-          </p>
-        ) : null}
+          <Links project={project} />
+        </aside>
       </div>
+
+      <Dialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete project"
+        confirmLabel="Delete"
+        confirmVariant="destructive"
+        onConfirm={async () => {
+          await projectsApi.delete(project.id);
+          onDeleted();
+        }}
+      >
+        <Text variant="small">
+          Delete “{project.name}” on every device? Its conversations stay in your mailboxes; its
+          notes and links go. To keep it, settle it instead.
+        </Text>
+      </Dialog>
     </div>
   );
 }

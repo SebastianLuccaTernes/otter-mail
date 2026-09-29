@@ -4,7 +4,7 @@
  * shown like a mailbox: its label id is `project:<id>`.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   useInfiniteQuery,
   useQuery,
@@ -19,11 +19,15 @@ import type {
   ProjectThread,
 } from "@otter-mail/contracts/projects";
 
+import { setSyncedPreference } from "../synced-preferences";
 import type { GmailMessageSummary } from "./types";
 
 export type { Project, ProjectDocument, ProjectLink, ProjectThread };
 
 const PREFIX = "project:";
+
+/** The Projects page: every project, from the sidebar's Projects row. */
+export const PROJECTS_LABEL = "projects";
 
 export const projectLabelId = (id: string) => `${PREFIX}${id}`;
 
@@ -137,4 +141,38 @@ export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+const FAVORITES = "gmail:favorites";
+
+function readFavorites(): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(FAVORITES) ?? "[]") as unknown;
+    return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The projects pinned to the sidebar's Favorites (synced with the account), in pin order. */
+export function useFavoriteProjects() {
+  const [ids, setIds] = useState(readFavorites);
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === FAVORITES) setIds(readFavorites());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+  const save = (next: string[]) => {
+    setSyncedPreference(FAVORITES, JSON.stringify(next));
+    setIds(next);
+    // Other components holding the hook follow too.
+    window.dispatchEvent(new StorageEvent("storage", { key: FAVORITES }));
+  };
+  return {
+    ids,
+    isFavorite: (id: string) => ids.includes(id),
+    toggle: (id: string) => save(ids.includes(id) ? ids.filter((f) => f !== id) : [...ids, id]),
+  };
 }

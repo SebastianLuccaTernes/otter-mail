@@ -34,6 +34,7 @@ import {
   CircleChevronDownIcon,
   PaperclipIcon,
   FolderIcon,
+  ChevronLeftIcon,
 } from "lucide-react";
 import { IconBtn, HintTooltip, cn } from "./ui";
 import {
@@ -120,9 +121,9 @@ type MessageListProps = {
   search?: SearchMode;
   /**
    * Set when the list is a project's conversations (with `combined` for its
-   * cross-mailbox rows, rules empty), optionally one mailbox's of them.
+   * cross-mailbox rows, rules empty); `onBack` goes to the Projects page.
    */
-  project?: { id: string; mailbox: string | null };
+  project?: { id: string; onBack: () => void };
 };
 
 /** The Search mailbox: the query that ran, its account scope, and its controls. */
@@ -756,9 +757,7 @@ export function MessageList({
       ? viewSearchQuery(combined.rules, nameOf)
       : (labelSearchToken(labelId, nameOf(accountId, labelId)) ?? "");
   }
-  const projectRows = projectThreads.data?.pages[0]?.messages.filter(
-    (m) => !project?.mailbox || m.accountId === project.mailbox,
-  );
+  const projectRows = projectThreads.data?.pages[0]?.messages;
   const { mailboxTotal, mailboxUnread } = project
     ? {
         mailboxTotal: projectRows?.length ?? 0,
@@ -773,12 +772,9 @@ export function MessageList({
 
   // Search pages are merged per account; a conversation seen on an earlier
   // page isn't repeated.
-  const projectMailbox = project?.mailbox ?? null;
   const allMessages: GmailMessageSummary[] = useMemo(() => {
     const pages: { messages: GmailMessageSummary[] }[] = messagesQuery.data?.pages ?? [];
-    const rows = pages
-      .flatMap((p) => p.messages)
-      .filter((m) => !projectMailbox || m.accountId === projectMailbox);
+    const rows = pages.flatMap((p) => p.messages);
     if (!globalSearching) return rows;
     const seen = new Set<string>();
     return rows.filter((m) => {
@@ -787,7 +783,7 @@ export function MessageList({
       seen.add(key);
       return true;
     });
-  }, [messagesQuery.data, globalSearching, projectMailbox]);
+  }, [messagesQuery.data, globalSearching]);
   // In Unread mode, clicking a message marks it read (optimistically), which
   // would normally drop it from this filter instantly. Keep the currently
   // selected row pinned in place — Gmail-style — so it only disappears once the
@@ -1529,6 +1525,16 @@ export function MessageList({
         )}
       >
         {headerLeading}
+        {project ? (
+          <button
+            type="button"
+            onClick={project.onBack}
+            className="no-drag -ml-1.5 flex h-7 shrink-0 items-center gap-0.5 rounded-md pl-0.5 pr-1.5 text-sm text-muted-foreground outline-none hover:bg-accent-surface hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
+          >
+            <ChevronLeftIcon className="size-4" />
+            Projects
+          </button>
+        ) : null}
         <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
           {project
             ? formatConversationSummary(mailboxTotal, mailboxUnread)
