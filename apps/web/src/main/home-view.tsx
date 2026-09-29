@@ -82,10 +82,16 @@ import {
 import { ALL_MAIL_LABEL_ID } from "./gmail/label-names";
 import { useMonochromeTheme } from "./theme/apply-theme";
 import { useMailboxes } from "./mailboxes";
-import { projectIdOf, projectLabelId, useProject, useProjects } from "./gmail/projects";
+import {
+  PROJECTS_LABEL,
+  projectIdOf,
+  projectLabelId,
+  useProject,
+  useProjects,
+} from "./gmail/projects";
 import { ProjectView } from "./gmail/project-view";
 import { NewProjectDialog } from "./gmail/project-menus";
-import { ProjectSidebar } from "./gmail/project-sidebar";
+import { ProjectList } from "./gmail/project-list";
 
 /** Narrowest the reader gets when the chat panel is dragged wider. */
 const READER_MIN_WIDTH = 360;
@@ -685,7 +691,7 @@ export function HomeView() {
   const selectedProject = useProject(selectedProjectId);
   const projectsLoaded = useProjects().isSuccess;
   useEffect(() => {
-    if (selectedLabelId === SEARCH_MAILBOX) return;
+    if (selectedLabelId === SEARCH_MAILBOX || selectedLabelId === PROJECTS_LABEL) return;
     // A project is every mailbox's; one deleted (here or elsewhere) goes back to Inbox.
     if (selectedProjectId) {
       if (projectsLoaded && !selectedProject)
@@ -742,9 +748,6 @@ export function HomeView() {
     root.setProperty("--primary-foreground", contrast);
     root.setProperty("--ring", brand);
   }, [brand]);
-
-  // Which mailbox's conversations a project's list shows (null: all).
-  const [projectMailbox, setProjectMailbox] = useState<string | null>(null);
 
   // Resolve the selected view to concrete per-account rules. A project's
   // conversations list like a Combined view (every mailbox's), without rules.
@@ -805,12 +808,11 @@ export function HomeView() {
     setReaderAccountId(null);
   };
 
-  // A project is a place like a mailbox (every mailbox's conversations in
-  // it), picked from the same switcher; it opens at its overview.
+  // A project opens like a mailbox: its conversations (every mailbox's) in
+  // the list, its page next to them.
   const openProject = (id: string) => {
     console.log("[HomeView:openProject]");
     setSettingsRoute(null);
-    setProjectMailbox(null);
     handleSelectLabel(projectLabelId(id));
   };
 
@@ -1136,25 +1138,6 @@ export function HomeView() {
                         onBack={() => setSettingsRoute(null)}
                       />
                     </>
-                  ) : selectedProject ? (
-                    <ProjectSidebar
-                      project={selectedProject}
-                      accounts={accounts}
-                      overview={!selectedMessageId}
-                      onOverview={() => {
-                        setSelectedMessageId(null);
-                        setReaderAccountId(null);
-                      }}
-                      mailbox={projectMailbox}
-                      onMailbox={setProjectMailbox}
-                      onSelectAccount={handleSelectAccount}
-                      onSelectProject={openProject}
-                      onOpenSettings={(pane = "general") =>
-                        setSettingsRoute({ pane, viewId: null, mailbox: null })
-                      }
-                      onSync={syncNow}
-                      syncing={globalSync.syncing || manualSyncing}
-                    />
                   ) : (
                     <AccountsSidebar
                       onOpenSettings={(pane = "general") =>
@@ -1189,7 +1172,6 @@ export function HomeView() {
                       }}
                       onCloseSearch={closeSearch}
                       onOpenSearch={() => openSearch()}
-                      onSelectProject={openProject}
                     />
                   )}
                 </div>
@@ -1217,53 +1199,63 @@ export function HomeView() {
                   style={{ width: listPane.width }}
                   className={`${PANE_LIST} shrink-0`}
                 >
-                  <MessageList
-                    headerLeading={sidebarOpen ? null : <TitlebarInset />}
-                    accountId={(isCombined ? firstRealAccountId : effectiveAccountId) ?? ""}
-                    labelId={selectedLabelId}
-                    combined={combined}
-                    accountIds={accountIds}
-                    accounts={accounts}
-                    selectedMessageId={selectedMessageId}
-                    focusedMessageId={focusedMessageId}
-                    onSelectMessage={handleSelectMessage}
-                    onDeselect={() => {
-                      setSelectedMessageId(null);
-                      setReaderAccountId(null);
-                    }}
-                    advanceRef={advanceRef}
-                    onSelectionChange={setChatSelection}
-                    onOpenChat={openChat}
-                    onSearchView={searchFromView}
-                    viewQueryRef={viewQueryRef}
-                    project={
-                      selectedProject && !activeSearch
-                        ? { id: selectedProject.id, mailbox: projectMailbox }
-                        : undefined
-                    }
-                    search={
-                      activeSearch
-                        ? {
-                            id: activeSearch.id,
-                            query: activeSearch.query,
-                            base: activeSearch.base,
-                            accountIds: activeSearch.scope,
-                            onSearch: runSearch,
-                            onClear: () => {
-                              const base = activeSearch.base ? `${activeSearch.base} ` : "";
-                              patchSearch(activeSearch.id, { query: "", draft: base });
-                              focusSearchEnd();
-                            },
-                            onExit: () => closeSearch(activeSearch.id),
-                            onScope: (scope) => patchSearch(activeSearch.id, { scope }),
-                            focusRef: searchRef,
-                            draft: activeSearch.draft,
-                            onDraftChange: (draft) => patchSearch(activeSearch.id, { draft }),
-                            messageOpen: selectedMessageId !== null,
-                          }
-                        : undefined
-                    }
-                  />
+                  {selectedLabelId === PROJECTS_LABEL ? (
+                    <ProjectList
+                      headerLeading={sidebarOpen ? null : <TitlebarInset />}
+                      onOpenProject={openProject}
+                    />
+                  ) : (
+                    <MessageList
+                      headerLeading={sidebarOpen ? null : <TitlebarInset />}
+                      accountId={(isCombined ? firstRealAccountId : effectiveAccountId) ?? ""}
+                      labelId={selectedLabelId}
+                      combined={combined}
+                      accountIds={accountIds}
+                      accounts={accounts}
+                      selectedMessageId={selectedMessageId}
+                      focusedMessageId={focusedMessageId}
+                      onSelectMessage={handleSelectMessage}
+                      onDeselect={() => {
+                        setSelectedMessageId(null);
+                        setReaderAccountId(null);
+                      }}
+                      advanceRef={advanceRef}
+                      onSelectionChange={setChatSelection}
+                      onOpenChat={openChat}
+                      onSearchView={searchFromView}
+                      viewQueryRef={viewQueryRef}
+                      project={
+                        selectedProject && !activeSearch
+                          ? {
+                              id: selectedProject.id,
+                              onBack: () => handleSelectLabel(PROJECTS_LABEL),
+                            }
+                          : undefined
+                      }
+                      search={
+                        activeSearch
+                          ? {
+                              id: activeSearch.id,
+                              query: activeSearch.query,
+                              base: activeSearch.base,
+                              accountIds: activeSearch.scope,
+                              onSearch: runSearch,
+                              onClear: () => {
+                                const base = activeSearch.base ? `${activeSearch.base} ` : "";
+                                patchSearch(activeSearch.id, { query: "", draft: base });
+                                focusSearchEnd();
+                              },
+                              onExit: () => closeSearch(activeSearch.id),
+                              onScope: (scope) => patchSearch(activeSearch.id, { scope }),
+                              focusRef: searchRef,
+                              draft: activeSearch.draft,
+                              onDraftChange: (draft) => patchSearch(activeSearch.id, { draft }),
+                              messageOpen: selectedMessageId !== null,
+                            }
+                          : undefined
+                      }
+                    />
+                  )}
                 </div>
                 <PaneResizer onPointerDown={listPane.start} />
               </>
@@ -1284,13 +1276,20 @@ export function HomeView() {
                     }}
                     prefill={mailtoPrefill ?? undefined}
                   />
+                ) : selectedLabelId === PROJECTS_LABEL ? (
+                  <div className="flex h-full items-center justify-center">
+                    <EmptyState
+                      title="Pick a project"
+                      description="Its conversations, from every mailbox, open in the list; its notes, documents and links here."
+                    />
+                  </div>
                 ) : selectedProject && !selectedMessageId && !searchActive ? (
                   <ProjectView
                     project={selectedProject}
                     onOpenMessage={(accountId, messageId) =>
                       handleSelectMessage(messageId, accountId)
                     }
-                    onAskAssistant={openChat}
+                    onAskAgent={openChat}
                     onDeleted={() => handleSelectAccount(effectiveAccountId ?? COMBINED_ACCOUNT_ID)}
                   />
                 ) : readerAccount ? (

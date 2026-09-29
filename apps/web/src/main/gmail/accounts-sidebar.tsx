@@ -43,6 +43,9 @@ import {
   SquarePenIcon,
   RotateCwIcon,
   LogInIcon,
+  CircleCheckIcon,
+  FolderIcon,
+  FolderKanbanIcon,
 } from "lucide-react";
 import {
   useLabels,
@@ -78,6 +81,16 @@ import type { SettingsPane } from "./api";
 import { UpdateCard } from "../updates";
 import { AddMailboxMenu } from "./add-mailbox";
 import { useCapabilities } from "./capabilities";
+import {
+  PROJECTS_LABEL,
+  projectIdOf,
+  projectLabelId,
+  projectsApi,
+  useFavoriteProjects,
+  useProjectUnreadCounts,
+  useProjects,
+  type Project,
+} from "./projects";
 
 const LABEL_DRAG_MIME = "application/x-gmail-label";
 
@@ -208,7 +221,7 @@ function SearchRow({
  * Sign in), Settings, and Sync now (only while push isn't live, as before;
  * ⌘, and ⌘R work either way).
  */
-export function AccountMenuItems({
+function AccountMenuItems({
   onOpenSettings,
   onSync,
   syncing,
@@ -633,6 +646,99 @@ function LabelNode({
   );
 }
 
+/** A pinned project: opens it; conversations dropped on it join it. */
+function FavoriteRow({
+  project,
+  selected,
+  unread,
+  onSelect,
+  onUnpin,
+}: {
+  project: Project;
+  selected: boolean;
+  unread: number;
+  onSelect: () => void;
+  onUnpin: () => void;
+}) {
+  const [dropActive, setDropActive] = useState(false);
+  const settled = project.status === "settled";
+  const dragProps: RowDragProps = {
+    onDragOver: (e) => {
+      if (!isThreadDrag(e.dataTransfer)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      setDropActive(true);
+    },
+    onDragLeave: () => setDropActive(false),
+    onDrop: (e) => {
+      setDropActive(false);
+      const payload = readThreadDrag(e.dataTransfer);
+      if (!payload) return;
+      e.preventDefault();
+      console.log("[AccountsSidebar:dropOnProject]", { count: payload.threads.length });
+      projectsApi
+        .addThreads(project.id, payload.threads)
+        .then(() =>
+          toast.success(
+            payload.threads.length === 1
+              ? `Added to “${project.name}”`
+              : `Added ${payload.threads.length} conversations to “${project.name}”`,
+          ),
+        )
+        .catch(() => toast.error("Couldn't add to the project"));
+    },
+  };
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger>
+        <SkRow
+          icon={
+            settled ? <CircleCheckIcon className="size-4" /> : <FolderIcon className="size-4" />
+          }
+          title={project.name}
+          selected={selected}
+          badge={settled ? undefined : unread}
+          dragProps={dragProps}
+          dropActive={dropActive}
+          onClick={onSelect}
+        />
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={onUnpin}>Remove from Favorites</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+/** Projects pinned from their page; absent while nothing is. */
+function FavoritesSection({
+  selectedLabelId,
+  onSelectLabel,
+}: {
+  selectedLabelId: string;
+  onSelectLabel: (labelId: string) => void;
+}) {
+  const projects = useProjects().data ?? [];
+  const unread = useProjectUnreadCounts().data ?? {};
+  const favorites = useFavoriteProjects();
+  const pinned = favorites.ids.flatMap((id) => projects.filter((p) => p.id === id));
+  if (pinned.length === 0) return null;
+  return (
+    <Section title="Favorites">
+      {pinned.map((project) => (
+        <FavoriteRow
+          key={project.id}
+          project={project}
+          selected={projectIdOf(selectedLabelId) === project.id}
+          unread={unread[project.id] ?? 0}
+          onSelect={() => onSelectLabel(projectLabelId(project.id))}
+          onUnpin={() => favorites.toggle(project.id)}
+        />
+      ))}
+    </Section>
+  );
+}
+
 type AccountsSidebarProps = {
   /** The app's menu: Settings (a pane, General by default) and Sync now. */
   onOpenSettings: (pane?: SettingsPane) => void;
@@ -655,8 +761,6 @@ type AccountsSidebarProps = {
   searches: SidebarSearch[];
   onSelectSearch: (id: string) => void;
   onCloseSearch: (id: string) => void;
-  /** Opens a project (from the heading's menu). */
-  onSelectProject: (projectId: string) => void;
 };
 
 /**
@@ -785,12 +889,13 @@ function SidebarPage({
   searches,
   onSelectSearch,
   onCloseSearch,
-  onSelectProject,
 }: AccountsSidebarProps & {
   /** The page showing; a neighbor drawn during a swipe is inert. */
   active: boolean;
 }) {
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
+  const openProjectId = projectIdOf(selectedLabelId);
+  const favorites = useFavoriteProjects();
 
   const labelsQuery = useLabels(isCombined ? null : selectedAccountId);
   const capabilities = useCapabilities(isCombined ? null : selectedAccountId);
@@ -1042,7 +1147,6 @@ function SidebarPage({
             accounts={accounts}
             selectedAccountId={selectedAccountId}
             onSelectAccount={onSelectAccount}
-            onSelectProject={onSelectProject}
           >
             <AccountMenuItems onOpenSettings={onOpenSettings} onSync={onSync} syncing={syncing} />
           </MailboxSwitcher>
@@ -1067,6 +1171,15 @@ function SidebarPage({
             selected={searchSelected}
             dot={searchPending}
             onClick={onOpenSearch}
+          />
+          <SkRow
+            icon={<FolderKanbanIcon className="size-4" />}
+            title="Projects"
+            selected={
+              selectedLabelId === PROJECTS_LABEL ||
+              (openProjectId !== null && !favorites.isFavorite(openProjectId))
+            }
+            onClick={() => onSelectLabel(PROJECTS_LABEL)}
           />
         </div>
 
@@ -1094,6 +1207,8 @@ function SidebarPage({
                     <SearchRows parent={view.id} />
                   </Fragment>
                 ))}
+
+              <FavoritesSection selectedLabelId={selectedLabelId} onSelectLabel={onSelectLabel} />
 
               <Section
                 title="Views"
@@ -1136,6 +1251,8 @@ function SidebarPage({
                   </Fragment>
                 );
               })}
+
+              <FavoritesSection selectedLabelId={selectedLabelId} onSelectLabel={onSelectLabel} />
 
               <Section
                 title="Views"
