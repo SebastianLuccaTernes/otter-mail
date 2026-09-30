@@ -15,7 +15,8 @@ their code.
   the system's glass toolbar. Replying starts from a glass field at the bottom, like ChatGPT's
   composer.
 - **Every theme.** The themes are the desktop's (`Resources/Themes.json`), light and dark, blended
-  the same way (`Theme/Theme.swift`).
+  the same way (`Theme/Theme.swift`). Themes you make on the Mac or the web sync too; the phone
+  grows their colors the way `packages/shared` does (`Theme/CustomTheme.swift`) and lets you pick them.
 
 ## How it works
 

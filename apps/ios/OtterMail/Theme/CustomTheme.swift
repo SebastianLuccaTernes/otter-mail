@@ -8,6 +8,21 @@ import SwiftUI
 struct CustomTheme: Decodable {
     struct Seeds: Decodable {
         let background, sidebar, text, accent: String
+
+        /** Every seed as lowercase "#rrggbb" ("#abc" expanded), or nil if one isn't hex: TS's normalizeHex. */
+        var normalized: Seeds? {
+            let seeds = [background, sidebar, text, accent].compactMap(Self.normalize)
+            guard seeds.count == 4 else { return nil }
+            return Seeds(background: seeds[0], sidebar: seeds[1], text: seeds[2], accent: seeds[3])
+        }
+
+        private static func normalize(_ value: String) -> String? {
+            var digits = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if digits.hasPrefix("#") { digits.removeFirst() }
+            guard digits.allSatisfy({ "0123456789abcdef".contains($0) }) else { return nil }
+            if digits.count == 3 { digits = digits.map { "\($0)\($0)" }.joined() }
+            return digits.count == 6 ? "#" + digits : nil
+        }
     }
 
     let id: String
@@ -30,7 +45,12 @@ struct CustomTheme: Decodable {
         }
         guard let data = raw?.data(using: .utf8), let entries = try? JSONDecoder().decode([Entry].self, from: data)
         else { return [] }
-        return entries.compactMap(\.theme).filter { $0.id.hasPrefix("custom-") && !$0.label.isEmpty }.map(\.theme)
+        return entries.compactMap(\.theme).compactMap { entry in
+            guard entry.id.hasPrefix("custom-"), !entry.label.isEmpty,
+                  let light = entry.light.normalized, let dark = entry.dark.normalized
+            else { return nil }
+            return CustomTheme(id: entry.id, label: entry.label, light: light, dark: dark).theme
+        }
     }
 
     /**

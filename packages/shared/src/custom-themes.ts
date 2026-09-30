@@ -3,7 +3,8 @@
  * sidebar, text, accent) and every other role is grown from them by blending
  * in Oklab, like CSS's `color-mix(in oklab, …)`. The web app stores them as the
  * synced ui preference "otter:custom-themes"; the iPhone app ports this math
- * (apps/ios's Theme.swift, `RGB`) and must paint the same hex for every role.
+ * (apps/ios's Theme/CustomTheme.swift, on Theme.swift's `RGB`) and must paint
+ * the same hex for every role.
  */
 
 import {
