@@ -5,10 +5,12 @@ import { gmailApi } from "../gmail/api";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "../gmail/toast";
 import type { NativeThemeInfo } from "@otter-mail/contracts";
-import { MoonIcon, PencilIcon, PlusIcon, SunIcon } from "lucide-react";
+import { CopyIcon, MoonIcon, PencilIcon, PlusIcon, SunIcon } from "lucide-react";
 import { cn, HintTooltip, IconBtn } from "../gmail/ui";
 import { Dialog } from "~/components/ui/dialog";
+import { Text } from "~/components/ui/text";
 import {
+  deleteCustomTheme,
   getCustomThemes,
   saveCustomTheme,
   setThemeForAppearance,
@@ -314,6 +316,16 @@ function NewThemeCard({ onClick }: { onClick: () => void }) {
 // Custom theme editor
 // ---------------------------------------------------------------------------
 
+/** A theme of your own to start from: `light` and `dark` are the themes whose colors it takes. */
+function newCustomTheme(label: string, light: string, dark: string): CustomTheme {
+  return {
+    id: `custom-${crypto.randomUUID().slice(0, 8)}`,
+    label,
+    light: seedsFrom(themeColors(light, "light")),
+    dark: seedsFrom(themeColors(dark, "dark")),
+  };
+}
+
 const SEED_ROWS: { key: keyof ThemeSeeds; label: string }[] = [
   { key: "background", label: "Background" },
   { key: "sidebar", label: "Sidebar" },
@@ -332,6 +344,7 @@ function ThemeEditor({
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(theme);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [cell, setCell] = useState<{ mode: ThemeAppearance; key: keyof ThemeSeeds }>({
     mode: "light",
     key: "background",
@@ -339,60 +352,80 @@ function ThemeEditor({
   const label = draft.label.trim();
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      title={isNew ? "New theme" : "Edit theme"}
-      size="xl"
-      confirmLabel="Save"
-      confirmDisabled={!label}
-      onConfirm={() => {
-        saveCustomTheme({ ...draft, label });
-        // A new theme is worn at once; an edit leaves the picks alone.
-        if (isNew)
-          for (const mode of ["light", "dark"] as const) setThemeForAppearance(mode, draft.id);
-      }}
-    >
-      <TextInput
-        aria-label="Theme name"
-        placeholder="Name"
-        maxLength={40}
-        value={draft.label}
-        onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-      />
-      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_13rem] gap-6">
-        <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
-          <span />
-          {(["light", "dark"] as const).map((mode) => (
-            <div key={mode} className="flex flex-col items-center gap-1.5 pb-1">
-              <span className="block aspect-[16/10] w-full overflow-hidden rounded-lg border border-border/60">
-                <MiniWindow colors={customThemeColors(draft[mode], mode)} />
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {mode === "light" ? "Light" : "Dark"}
-              </span>
-            </div>
-          ))}
-          {SEED_ROWS.map((row) => (
-            <SeedRow
-              key={row.key}
-              label={row.label}
-              colors={[draft.light[row.key], draft.dark[row.key]]}
-              selected={cell.key === row.key ? cell.mode : null}
-              onSelect={(mode) => setCell({ mode, key: row.key })}
-            />
-          ))}
-        </div>
-        <HexColorField
-          value={draft[cell.mode][cell.key]}
-          onChange={(hex) =>
-            setDraft((d) => ({ ...d, [cell.mode]: { ...d[cell.mode], [cell.key]: hex } }))
-          }
+    <>
+      <Dialog
+        open
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+        title={isNew ? "New theme" : "Edit theme"}
+        size="xl"
+        confirmLabel="Save"
+        confirmDisabled={!label}
+        destructiveAction={
+          isNew ? undefined : { label: "Delete", onClick: () => setConfirmDelete(true) }
+        }
+        onConfirm={() => {
+          saveCustomTheme({ ...draft, label });
+          // A new theme is worn at once; an edit leaves the picks alone.
+          if (isNew)
+            for (const mode of ["light", "dark"] as const) setThemeForAppearance(mode, draft.id);
+        }}
+      >
+        <TextInput
+          aria-label="Theme name"
+          placeholder="Name"
+          maxLength={40}
+          value={draft.label}
+          onChange={(e) => setDraft({ ...draft, label: e.target.value })}
         />
-      </div>
-    </Dialog>
+        <div className="mt-2 grid grid-cols-[minmax(0,1fr)_13rem] gap-6">
+          <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
+            <span />
+            {(["light", "dark"] as const).map((mode) => (
+              <div key={mode} className="flex flex-col items-center gap-1.5 pb-1">
+                <span className="block aspect-[16/10] w-full overflow-hidden rounded-lg border border-border/60">
+                  <MiniWindow colors={customThemeColors(draft[mode], mode)} />
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {mode === "light" ? "Light" : "Dark"}
+                </span>
+              </div>
+            ))}
+            {SEED_ROWS.map((row) => (
+              <SeedRow
+                key={row.key}
+                label={row.label}
+                colors={[draft.light[row.key], draft.dark[row.key]]}
+                selected={cell.key === row.key ? cell.mode : null}
+                onSelect={(mode) => setCell({ mode, key: row.key })}
+              />
+            ))}
+          </div>
+          <HexColorField
+            value={draft[cell.mode][cell.key]}
+            onChange={(hex) =>
+              setDraft((d) => ({ ...d, [cell.mode]: { ...d[cell.mode], [cell.key]: hex } }))
+            }
+          />
+        </div>
+      </Dialog>
+      <Dialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={`Delete “${theme.label}”?`}
+        confirmLabel="Delete theme"
+        confirmVariant="accent"
+        onConfirm={() => {
+          deleteCustomTheme(theme.id);
+          onClose();
+        }}
+      >
+        <Text variant="small">
+          It's removed on all your devices, and Codex takes its place wherever you wear it.
+        </Text>
+      </Dialog>
+    </>
   );
 }
 
@@ -551,7 +584,19 @@ export function AppearancePane() {
                     >
                       <PencilIcon />
                     </IconBtn>
-                  ) : undefined
+                  ) : (
+                    <IconBtn
+                      label={`Duplicate ${theme.label}`}
+                      onClick={() =>
+                        setEditing({
+                          theme: newCustomTheme(`${theme.label} copy`, theme.id, theme.id),
+                          isNew: true,
+                        })
+                      }
+                    >
+                      <CopyIcon />
+                    </IconBtn>
+                  )
                 }
               />
             );
@@ -559,12 +604,7 @@ export function AppearancePane() {
           <NewThemeCard
             onClick={() =>
               setEditing({
-                theme: {
-                  id: `custom-${crypto.randomUUID().slice(0, 8)}`,
-                  label: "New theme",
-                  light: seedsFrom(themeColors(choice.light, "light")),
-                  dark: seedsFrom(themeColors(choice.dark, "dark")),
-                },
+                theme: newCustomTheme("New theme", choice.light, choice.dark),
                 isNew: true,
               })
             }
