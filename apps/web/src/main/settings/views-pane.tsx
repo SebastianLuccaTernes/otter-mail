@@ -25,7 +25,13 @@ import {
 } from "../gmail/menu";
 import type { GmailAccount, GmailLabel, MailView } from "../gmail/types";
 import { Btn, IconBtn } from "../gmail/ui";
-import { SettingsGroup, SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
+import {
+  SettingsGroup,
+  SettingsPageContainer,
+  SettingsRow,
+  SettingsSection,
+  useSettingsSearchMatch,
+} from "./settings-ui";
 
 /**
  * Settings › Views: custom views grouped by the mailbox that owns them. Each
@@ -80,6 +86,7 @@ function ViewRow({
   const counts = useCombinedCounts(rules, view.id);
   const { include, exclude } = ruleSummary(view, lookup);
   const ruleAccounts = accounts.filter((a) => rules.some((r) => r.accountId === a.id));
+  if (!useSettingsSearchMatch(view.name, ...include.map((l) => l.name), ...exclude)) return null;
 
   return (
     <div

@@ -33,6 +33,7 @@ import {
   SettingsRow,
   SettingsSection,
   TextInput,
+  useSettingsSearchMatch,
 } from "./settings-ui";
 import { RUNTIME_MODE_OPTIONS } from "../gmail/model-picker";
 import {
@@ -94,6 +95,7 @@ function ProviderListRow({
   const summary = providerSummary(provider);
   const version = providerVersionLabel(provider.version);
   const needsAttention = provider.status === "warning" || provider.status === "error";
+  if (!useSettingsSearchMatch(provider.displayName, summary.headline)) return null;
   return (
     <div
       data-slot="settings-row"

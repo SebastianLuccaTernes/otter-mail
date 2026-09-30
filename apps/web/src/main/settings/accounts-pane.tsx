@@ -32,6 +32,7 @@ import {
   SettingsPageContainer,
   SettingsRow,
   SettingsSection,
+  useSettingsSearchMatch,
 } from "./settings-ui";
 
 /**
@@ -286,6 +287,7 @@ function AccountListRow({
   onDragEnd: () => void;
 }) {
   const sync = useSyncStatusOnly(account.id);
+  if (!useSettingsSearchMatch(getAccountDisplayName(account), account.email)) return null;
   const status = accountStatus(account, sync.data);
   const dropHere = dropSpot?.email === account.email;
   return (
@@ -366,6 +368,7 @@ function AccountListRow({
 
 /** "All mailboxes", the combined inbox: pinned first, only turned on or off. */
 function AllMailboxesRow({ on, onToggle }: { on: boolean; onToggle: (on: boolean) => void }) {
+  if (!useSettingsSearchMatch("All mailboxes", "One inbox for every mailbox")) return null;
   return (
     <div data-slot="settings-row" className="flex min-h-[60px] items-center gap-3 px-4 py-2.5">
       <span className={cn("contents", !on && "[&>*]:opacity-50")}>
