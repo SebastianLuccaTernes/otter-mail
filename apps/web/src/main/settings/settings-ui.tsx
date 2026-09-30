@@ -1,4 +1,13 @@
-import { forwardRef, useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import {
+  createContext,
+  forwardRef,
+  isValidElement,
+  useContext,
+  useEffect,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { Undo2Icon } from "lucide-react";
 import { cn, HintTooltip } from "../gmail/ui";
 
@@ -8,6 +17,91 @@ import { cn, HintTooltip } from "../gmail/ui";
  * inside a card every row's text starts 16px in and every control ends 16px
  * from the right.
  */
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+/**
+ * Settings search: while a query is set, rows that don't match it render
+ * nothing, and sections and pages left without rows hide themselves. A page or
+ * section whose own title matches keeps all of its rows.
+ */
+type SettingsSearch = { query: string; matched: boolean };
+
+const SettingsSearchContext = createContext<SettingsSearch>({ query: "", matched: false });
+
+/** The plain text of a title or description, for matching. */
+function nodeText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join(" ");
+  if (isValidElement<{ children?: ReactNode }>(node)) return nodeText(node.props.children);
+  return "";
+}
+
+/** Every word of the query appears somewhere in the texts. */
+function matchesQuery(query: string, texts: ReactNode[]): boolean {
+  const haystack = texts.map(nodeText).join(" ").toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((word) => haystack.includes(word));
+}
+
+/** The search in effect here ("" outside a search). */
+export function useSettingsSearch(): SettingsSearch {
+  return useContext(SettingsSearchContext);
+}
+
+/** Whether something titled by `texts` shows under the current search. */
+export function useSettingsSearchMatch(...texts: ReactNode[]): boolean {
+  const { query, matched } = useSettingsSearch();
+  return !query || matched || matchesQuery(query, texts);
+}
+
+/** Searches everything inside for `query`. */
+export function SettingsSearchProvider({
+  query,
+  children,
+}: {
+  query: string;
+  children: ReactNode;
+}) {
+  return (
+    <SettingsSearchContext.Provider value={{ query: query.trim(), matched: false }}>
+      {children}
+    </SettingsSearchContext.Provider>
+  );
+}
+
+/** Everything inside shows when `texts` (a page or section title) match the search. */
+function SettingsSearchScope({ texts, children }: { texts: ReactNode[]; children: ReactNode }) {
+  const search = useSettingsSearch();
+  const matched = search.matched || (!!search.query && matchesQuery(search.query, texts));
+  if (matched === search.matched) return children;
+  return (
+    <SettingsSearchContext.Provider value={{ ...search, matched }}>
+      {children}
+    </SettingsSearchContext.Provider>
+  );
+}
+
+/**
+ * While searching, hides a page or section that neither matched by its title
+ * nor kept a row. Matched ones carry data-search-hit, so grids and lists
+ * without rows still count as results.
+ */
+export function settingsSearchHideEmpty(
+  search: SettingsSearch,
+  matched: boolean,
+): { className?: string; "data-search-hit"?: "" } {
+  if (!search.query) return {};
+  if (matched) return { "data-search-hit": "" };
+  return {
+    className: "[&:not(:has([data-slot=settings-row],[data-search-hit]))]:hidden",
+  };
+}
 
 /** Shared settings card surface, with separators between rows. */
 export function SettingsGroup({
@@ -95,15 +189,20 @@ export function SettingsSection({
   variant?: "grouped" | "plain";
   children: ReactNode;
 }) {
+  const search = useSettingsSearch();
+  const matched = !!search.query && (search.matched || matchesQuery(search.query, [title]));
+  const hide = settingsSearchHideEmpty(search, matched);
   return (
-    <section {...props} className={className}>
+    <section {...props} {...hide} className={cn(className, hide.className)}>
       <SettingsSectionHeader
         title={title}
         description={description}
         icon={icon}
         action={headerAction}
       />
-      {variant === "grouped" ? <SettingsGroup>{children}</SettingsGroup> : children}
+      <SettingsSearchScope texts={[title]}>
+        {variant === "grouped" ? <SettingsGroup>{children}</SettingsGroup> : children}
+      </SettingsSearchScope>
     </section>
   );
 }
@@ -130,6 +229,7 @@ export function SettingsRow({
   resetAction?: ReactNode;
   children?: ReactNode;
 }) {
+  if (!useSettingsSearchMatch(title, description)) return null;
   return (
     <div
       {...props}
@@ -203,6 +303,26 @@ export function SettingsPageContainer({
   /** Beside the title, right-aligned with the cards' edge. */
   action?: ReactNode;
 }) {
+  const search = useSettingsSearch();
+  if (search.query) {
+    // One page among the search results: a smaller title, no action, and the
+    // results scroll as one.
+    const matched = search.matched || matchesQuery(search.query, [title]);
+    const hide = settingsSearchHideEmpty(search, matched);
+    return (
+      <div {...props} {...hide} className={cn("space-y-6", hide.className)}>
+        {title ? (
+          <h2
+            data-slot="settings-page-title"
+            className="px-[17px] text-base font-medium text-foreground"
+          >
+            {title}
+          </h2>
+        ) : null}
+        <SettingsSearchScope texts={[title]}>{children}</SettingsSearchScope>
+      </div>
+    );
+  }
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div
