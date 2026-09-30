@@ -247,6 +247,9 @@ function MailHome() {
   const [settingsRoute, setSettingsRoute] = useState<SettingsRoute | null>(null);
   const settingsRouteRef = useRef(settingsRoute);
   settingsRouteRef.current = settingsRoute;
+  // Settings' own search, in the sidebar; its query lives in the route, so
+  // picking a section or leaving Settings clears it.
+  const settingsSearchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const pull = async () => {
       try {
@@ -277,10 +280,17 @@ function MailHome() {
       }),
     [],
   );
-  // Escape leaves settings (blurring a focused field first, like a dialog).
+  // Escape leaves settings (clearing the search, then blurring a focused
+  // field first, like a dialog).
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || !settingsRouteRef.current) return;
+      const route = settingsRouteRef.current;
+      if (e.key !== "Escape" || e.defaultPrevented || !route) return;
+      if (e.target === settingsSearchRef.current && route.query) {
+        e.preventDefault();
+        setSettingsRoute({ ...route, query: "" });
+        return;
+      }
       if (isTypingTarget(e)) {
         (document.activeElement as HTMLElement | null)?.blur();
         return;
@@ -1088,6 +1098,11 @@ function MailHome() {
                       <WindowTitle />
                       <SettingsNav
                         pane={settingsRoute.pane}
+                        query={settingsRoute.query ?? ""}
+                        onQueryChange={(query) =>
+                          setSettingsRoute((route) => route && { ...route, query })
+                        }
+                        searchRef={settingsSearchRef}
                         onSelect={(pane) => setSettingsRoute({ pane, viewId: null, mailbox: null })}
                         onBack={() => setSettingsRoute(null)}
                       />

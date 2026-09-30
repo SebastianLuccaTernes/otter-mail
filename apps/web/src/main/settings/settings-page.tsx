@@ -17,7 +17,12 @@ import { ProvidersPane } from "./providers-pane";
 import { ChangelogPane } from "./changelog-pane";
 import { TranslationSection } from "./translation-section";
 import { UpdatesSection } from "../updates";
-import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
+import {
+  SettingsPageContainer,
+  SettingsRow,
+  SettingsSearchProvider,
+  SettingsSection,
+} from "./settings-ui";
 import { features } from "../features";
 import { Btn } from "../gmail/ui";
 import { requestTour, startSetup } from "../onboarding/onboarding";
@@ -29,6 +34,8 @@ export type SettingsRoute = {
   viewId: string | null;
   /** For "new": which mailbox (account id or "__combined__") owns the view. */
   mailbox: string | null;
+  /** Typed in the sidebar's search: shows the matching settings of every pane instead. */
+  query?: string;
 };
 
 const NOTIFICATIONS_OPTIONS: { value: NotificationsMode; label: string }[] = [
@@ -337,10 +344,51 @@ function GeneralPane() {
 }
 
 // ---------------------------------------------------------------------------
+// Search results
+// ---------------------------------------------------------------------------
+
+/** Every pane but What's new, showing only what matches `query`, in one scrolling column. */
+function SettingsSearchResults({
+  query,
+  onNavigate,
+}: {
+  query: string;
+  onNavigate: (route: SettingsRoute) => void;
+}) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="group/results mx-auto w-full max-w-[47rem] space-y-10 px-6 pb-20 pt-14">
+        <h1 className="px-[17px] text-[26px] font-medium leading-8 tracking-[-0.01em] text-foreground">
+          Search results
+        </h1>
+        <SettingsSearchProvider query={query}>
+          <GeneralPane />
+          <OtterAccountPane />
+          <AppearancePane />
+          <KeybindingsPane />
+          <AccountsPane />
+          <ViewsPane
+            editingId={null}
+            editingMailbox={null}
+            onOpenView={(viewId, mailbox) => onNavigate({ pane: "views", viewId, mailbox })}
+            onDone={() => {}}
+          />
+          <ProvidersPane />
+        </SettingsSearchProvider>
+        {/* Rows and matched titles are what the panes show while searching. */}
+        <p className="px-[17px] text-sm text-muted-foreground group-has-[[data-slot=settings-row],[data-search-hit]]/results:hidden">
+          No settings match “{query.trim()}”.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
-/** In-app settings: one pane at a time, chosen from the sidebar nav. */
+/** In-app settings: one pane at a time, chosen from the sidebar nav, or the search's results. */
 export function SettingsPage({
   route,
   onNavigate,
@@ -348,6 +396,9 @@ export function SettingsPage({
   route: SettingsRoute;
   onNavigate: (route: SettingsRoute) => void;
 }) {
+  if (route.query?.trim()) {
+    return <SettingsSearchResults query={route.query} onNavigate={onNavigate} />;
+  }
   if (route.pane === "appearance") return <AppearancePane />;
   if (route.pane === "keybindings") return <KeybindingsPane />;
   if (route.pane === "accounts") return <AccountsPane />;

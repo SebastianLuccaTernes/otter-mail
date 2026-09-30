@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType, type RefObject } from "react";
 import {
   ArrowLeftIcon,
   CircleUserRoundIcon,
@@ -9,6 +9,7 @@ import {
   MailIcon,
   MailCheckIcon,
   MousePointer2Icon,
+  SearchIcon,
   SparklesIcon,
 } from "lucide-react";
 import { gmailApi, type SettingsPane } from "../gmail/api";
@@ -43,13 +44,22 @@ const ROW =
 const ROW_IDLE =
   "text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground [&>svg]:text-sidebar-muted-foreground hover:[&>svg]:text-sidebar-foreground";
 
-/** Sidebar contents while the settings page is open: the sections, then Back. */
+/**
+ * Sidebar contents while the settings page is open: the search, the sections,
+ * then Back. While searching, no section is selected: the results span them all.
+ */
 export function SettingsNav({
   pane,
+  query,
+  onQueryChange,
+  searchRef,
   onSelect,
   onBack,
 }: {
   pane: SettingsPane;
+  query: string;
+  onQueryChange: (query: string) => void;
+  searchRef: RefObject<HTMLInputElement | null>;
   onSelect: (pane: SettingsPane) => void;
   onBack: () => void;
 }) {
@@ -59,9 +69,20 @@ export function SettingsNav({
         <h2 className="mb-1 flex h-8 items-center px-(--sidebar-row-content-inset) text-base font-semibold text-sidebar-foreground">
           Settings
         </h2>
+        <div className="relative mb-2">
+          <SearchIcon className="pointer-events-none absolute start-(--sidebar-row-content-inset) top-1/2 size-4 -translate-y-1/2 text-sidebar-muted-foreground" />
+          <input
+            ref={searchRef}
+            value={query}
+            placeholder="Search settings"
+            aria-label="Search settings"
+            onChange={(e) => onQueryChange(e.target.value)}
+            className="h-8 w-full rounded-lg border border-transparent bg-sidebar-control-surface ps-[calc(var(--sidebar-row-content-inset)+25px)] pe-(--sidebar-row-content-inset) text-sm text-sidebar-foreground outline-none transition-[box-shadow,border-color] placeholder:text-sidebar-muted-foreground focus-visible:border-focus-ring/60 focus-visible:ring-[3px] focus-visible:ring-focus-ring/16"
+          />
+        </div>
         {SETTINGS_SECTIONS.map((section) => {
           const Icon = section.icon;
-          const active = section.id === pane;
+          const active = !query.trim() && section.id === pane;
           return (
             <button
               key={section.id}
