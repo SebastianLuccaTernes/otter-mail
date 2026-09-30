@@ -2,12 +2,15 @@ import { setSyncedPreference } from "../synced-preferences";
 import { Switch } from "~/components/ui/switch";
 import { features } from "../features";
 import { gmailApi } from "../gmail/api";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "../gmail/toast";
 import type { NativeThemeInfo } from "@otter-mail/contracts";
-import { MoonIcon, SunIcon } from "lucide-react";
-import { cn, HintTooltip } from "../gmail/ui";
+import { MoonIcon, PencilIcon, PlusIcon, SunIcon } from "lucide-react";
+import { cn, HintTooltip, IconBtn } from "../gmail/ui";
+import { Dialog } from "~/components/ui/dialog";
 import {
+  getCustomThemes,
+  saveCustomTheme,
   setThemeForAppearance,
   themeColors,
   useAppThemes,
@@ -18,6 +21,13 @@ import {
   type ThemeColors,
   type ThemeDefinition,
 } from "@otter-mail/shared/themes";
+import {
+  customThemeColors,
+  seedsFrom,
+  type CustomTheme,
+  type ThemeSeeds,
+} from "@otter-mail/shared/custom-themes";
+import { HexColorField } from "./hex-color-field";
 import {
   DEFAULT_PANEL_ANIMATION_DURATION_MS,
   MAX_PANEL_ANIMATION_DURATION_MS,
@@ -31,6 +41,7 @@ import {
   SettingsPageContainer,
   SettingsRow,
   SettingsSection,
+  TextInput,
 } from "./settings-ui";
 
 export type ColorScheme = "system" | "light" | "dark";
@@ -228,10 +239,13 @@ export function ThemeCard({
   theme,
   pickedModes,
   onPick,
+  action,
 }: {
   theme: ThemeDefinition;
   pickedModes: ThemeAppearance[];
   onPick: (modes: ThemeAppearance[]) => void;
+  /** A button by the label, shown while the card is hovered or focused. */
+  action?: ReactNode;
 }) {
   const active = pickedModes.length > 0;
   return (
@@ -247,7 +261,7 @@ export function ThemeCard({
         }
       }}
       className={cn(
-        "flex cursor-pointer flex-col gap-2 rounded-xl border bg-card pb-3.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        "group/card flex cursor-pointer flex-col gap-2 rounded-xl border bg-card pb-3.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
         active ? "border-foreground/25" : "border-border/60 hover:border-input",
       )}
     >
@@ -262,8 +276,162 @@ export function ThemeCard({
           />
         ))}
       </div>
-      <span className="px-4 text-sm text-foreground">{theme.label}</span>
+      <div className="flex items-center gap-2 px-4">
+        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{theme.label}</span>
+        {action ? (
+          <span
+            className="-my-1.5 -me-2 flex shrink-0 opacity-0 transition-opacity group-focus-within/card:opacity-100 group-hover/card:opacity-100"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            {action}
+          </span>
+        ) : null}
+      </div>
     </div>
+  );
+}
+
+/** The Themes grid's last card: starts a theme of your own. */
+function NewThemeCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex cursor-pointer flex-col gap-2 rounded-xl border border-dashed border-input pb-3.5 text-muted-foreground outline-none transition-colors hover:border-foreground/25 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
+    >
+      <span className="flex min-h-16 items-center justify-center px-3 pt-3">
+        <span className="flex size-[68px] items-center justify-center">
+          <PlusIcon className="size-5" />
+        </span>
+      </span>
+      <span className="px-4 text-start text-sm">New theme</span>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Custom theme editor
+// ---------------------------------------------------------------------------
+
+const SEED_ROWS: { key: keyof ThemeSeeds; label: string }[] = [
+  { key: "background", label: "Background" },
+  { key: "sidebar", label: "Sidebar" },
+  { key: "text", label: "Text" },
+  { key: "accent", label: "Accent" },
+];
+
+/** A theme's name and its four colors per appearance, with both previewed live. */
+function ThemeEditor({
+  theme,
+  isNew,
+  onClose,
+}: {
+  theme: CustomTheme;
+  isNew: boolean;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState(theme);
+  const [cell, setCell] = useState<{ mode: ThemeAppearance; key: keyof ThemeSeeds }>({
+    mode: "light",
+    key: "background",
+  });
+  const label = draft.label.trim();
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title={isNew ? "New theme" : "Edit theme"}
+      size="xl"
+      confirmLabel="Save"
+      confirmDisabled={!label}
+      onConfirm={() => {
+        saveCustomTheme({ ...draft, label });
+        // A new theme is worn at once; an edit leaves the picks alone.
+        if (isNew)
+          for (const mode of ["light", "dark"] as const) setThemeForAppearance(mode, draft.id);
+      }}
+    >
+      <TextInput
+        aria-label="Theme name"
+        placeholder="Name"
+        maxLength={40}
+        value={draft.label}
+        onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+      />
+      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_13rem] gap-6">
+        <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
+          <span />
+          {(["light", "dark"] as const).map((mode) => (
+            <div key={mode} className="flex flex-col items-center gap-1.5 pb-1">
+              <span className="block aspect-[16/10] w-full overflow-hidden rounded-lg border border-border/60">
+                <MiniWindow colors={customThemeColors(draft[mode], mode)} />
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {mode === "light" ? "Light" : "Dark"}
+              </span>
+            </div>
+          ))}
+          {SEED_ROWS.map((row) => (
+            <SeedRow
+              key={row.key}
+              label={row.label}
+              colors={[draft.light[row.key], draft.dark[row.key]]}
+              selected={cell.key === row.key ? cell.mode : null}
+              onSelect={(mode) => setCell({ mode, key: row.key })}
+            />
+          ))}
+        </div>
+        <HexColorField
+          value={draft[cell.mode][cell.key]}
+          onChange={(hex) =>
+            setDraft((d) => ({ ...d, [cell.mode]: { ...d[cell.mode], [cell.key]: hex } }))
+          }
+        />
+      </div>
+    </Dialog>
+  );
+}
+
+function SeedRow({
+  label,
+  colors,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  colors: [light: string, dark: string];
+  selected: ThemeAppearance | null;
+  onSelect: (mode: ThemeAppearance) => void;
+}) {
+  return (
+    <>
+      <span className="text-sm text-muted-foreground">{label}</span>
+      {(["light", "dark"] as const).map((mode, i) => (
+        <button
+          key={mode}
+          type="button"
+          aria-label={`${label}, ${mode}`}
+          aria-pressed={selected === mode}
+          onClick={() => onSelect(mode)}
+          className={cn(
+            "flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-surface-raised/60 px-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+            selected === mode
+              ? "border-focus-ring ring-1 ring-focus-ring"
+              : "border-border/70 hover:border-input",
+          )}
+        >
+          <span
+            className="size-4 shrink-0 rounded-full border border-foreground/15"
+            style={{ backgroundColor: colors[i] }}
+          />
+          <span className="font-mono text-xs uppercase text-foreground">{colors[i]}</span>
+        </button>
+      ))}
+    </>
   );
 }
 
@@ -328,6 +496,7 @@ export function AppearancePane() {
   const themes = useAppThemes();
   const [scheme, setScheme] = useColorScheme();
   const [dockBadge, setDockBadge] = useDockBadge();
+  const [editing, setEditing] = useState<{ theme: CustomTheme; isNew: boolean } | null>(null);
 
   const panelAnimationDurationMs = usePanelAnimationDurationMs();
   const panelAnimationDurationRatio =
@@ -360,21 +529,55 @@ export function AppearancePane() {
 
       <SettingsSection
         title="Themes"
-        description="Click a theme to use it everywhere, or a single orb to use it for light or dark mode only."
+        description="Click a theme to use it everywhere, or a single orb for light or dark mode only, or make your own."
         variant="plain"
       >
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {themes.map((theme) => (
-            <ThemeCard
-              key={theme.id}
-              theme={theme}
-              pickedModes={(["light", "dark"] as const).filter((m) => choice[m] === theme.id)}
-              onPick={(modes) => {
-                for (const mode of modes) setThemeForAppearance(mode, theme.id);
-              }}
-            />
-          ))}
+          {themes.map((theme) => {
+            const custom = getCustomThemes().find((t) => t.id === theme.id);
+            return (
+              <ThemeCard
+                key={theme.id}
+                theme={theme}
+                pickedModes={(["light", "dark"] as const).filter((m) => choice[m] === theme.id)}
+                onPick={(modes) => {
+                  for (const mode of modes) setThemeForAppearance(mode, theme.id);
+                }}
+                action={
+                  custom ? (
+                    <IconBtn
+                      label={`Edit ${theme.label}`}
+                      onClick={() => setEditing({ theme: custom, isNew: false })}
+                    >
+                      <PencilIcon />
+                    </IconBtn>
+                  ) : undefined
+                }
+              />
+            );
+          })}
+          <NewThemeCard
+            onClick={() =>
+              setEditing({
+                theme: {
+                  id: `custom-${crypto.randomUUID().slice(0, 8)}`,
+                  label: "New theme",
+                  light: seedsFrom(themeColors(choice.light, "light")),
+                  dark: seedsFrom(themeColors(choice.dark, "dark")),
+                },
+                isNew: true,
+              })
+            }
+          />
         </div>
+        {editing ? (
+          <ThemeEditor
+            key={editing.theme.id}
+            theme={editing.theme}
+            isNew={editing.isNew}
+            onClose={() => setEditing(null)}
+          />
+        ) : null}
       </SettingsSection>
 
       <SettingsSection title="Dock">

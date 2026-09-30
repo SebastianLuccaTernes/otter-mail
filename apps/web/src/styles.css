@@ -654,6 +654,27 @@ html[data-theme-switching] *::after {
 }
 
 /*
+ * The theme editor's color picker (react-colorful). Its own styles are
+ * injected unlayered, so these stay unlayered too and win on specificity.
+ */
+.hex-color-field .react-colorful__saturation {
+  border-bottom: 0;
+  border-radius: 0.5rem;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.hex-color-field .react-colorful__hue {
+  height: 0.75rem;
+  margin-top: 0.75rem;
+  border-radius: 9999px;
+}
+
+.hex-color-field .react-colorful__pointer {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/*
  * Window dragging (Electron). `.drag-region` strips move the frameless
  * window; controls stay clickable inside them. Electron applies these in
  * document order (a later no-drag carves a hole out of an earlier drag), so
