@@ -12,6 +12,7 @@ import { Text } from "~/components/ui/text";
 import {
   deleteCustomTheme,
   getCustomThemes,
+  INITIAL_THEME_ID,
   saveCustomTheme,
   setThemeForAppearance,
   themeColors,
@@ -19,6 +20,7 @@ import {
   useThemeChoice,
 } from "../theme/apply-theme";
 import {
+  APP_THEMES,
   type ThemeAppearance,
   type ThemeColors,
   type ThemeDefinition,
@@ -326,6 +328,9 @@ function newCustomTheme(label: string, light: string, dark: string): CustomTheme
   };
 }
 
+/** What a deleted theme's appearances fall back to (apply-theme's `deleteCustomTheme`). */
+const INITIAL_THEME_LABEL = APP_THEMES.find((t) => t.id === INITIAL_THEME_ID)?.label;
+
 const SEED_ROWS: { key: keyof ThemeSeeds; label: string }[] = [
   { key: "background", label: "Background" },
   { key: "sidebar", label: "Sidebar" },
@@ -422,7 +427,8 @@ function ThemeEditor({
         }}
       >
         <Text variant="small">
-          It's removed on all your devices, and Codex takes its place wherever you wear it.
+          It's removed on all your devices, and {INITIAL_THEME_LABEL} takes its place wherever you
+          wear it.
         </Text>
       </Dialog>
     </>
