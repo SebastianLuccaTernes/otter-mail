@@ -19,11 +19,17 @@ export function HexColorField({
   return (
     <div className="hex-color-field flex flex-col gap-3">
       <HexColorPicker color={value} onChange={emit} style={{ width: "100%", height: "11rem" }} />
-      {/* Looks like settings' TextInput; react-colorful renders its own <input>. */}
+      {/*
+        Looks like settings' TextInput; react-colorful renders its own <input>.
+        It counts "abc" as a whole color, and taking that mid-typing would
+        rewrite the field to "aabbcc": while typing only six digits count, and a
+        short hex is expanded when the field is left.
+      */}
       <HexColorInput
         prefixed
         color={value}
-        onChange={emit}
+        onChange={(next) => next.length === 7 && emit(next)}
+        onBlur={(e) => emit(e.currentTarget.value)}
         aria-label="Hex color"
         spellCheck={false}
         className="h-8 w-full min-w-0 rounded-lg border border-border/70 bg-surface-raised/60 px-[calc(--spacing(2.75)-1px)] font-mono text-sm uppercase text-foreground outline-none transition-[box-shadow,border-color,background-color] focus-visible:border-focus-ring/60 focus-visible:bg-canvas focus-visible:ring-[3px] focus-visible:ring-focus-ring/16"
