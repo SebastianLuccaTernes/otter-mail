@@ -27,6 +27,8 @@ import {
   SettingsPageContainer,
   SettingsRow,
   SettingsSection,
+  useSettingsSearch,
+  useSettingsSearchMatch,
 } from "./settings-ui";
 
 export type ColorScheme = "system" | "light" | "dark";
@@ -230,8 +232,11 @@ export function ThemeCard({
   onPick: (modes: ThemeAppearance[]) => void;
 }) {
   const active = pickedModes.length > 0;
+  const search = useSettingsSearch();
+  if (!useSettingsSearchMatch(theme.label)) return null;
   return (
     <div
+      data-search-hit={search.query ? "" : undefined}
       role="button"
       tabIndex={0}
       aria-label={`Use ${theme.label} for light and dark mode`}
