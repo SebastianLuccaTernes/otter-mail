@@ -130,7 +130,7 @@ The Mac app supports Apple Silicon Macs (arm64).
 
 | Feature                                                  | Mac                                 | Web                                 | iPhone                                                                     |
 | -------------------------------------------------------- | ----------------------------------- | ----------------------------------- | -------------------------------------------------------------------------- |
-| 7 themes, a light and a dark pick; System / Light / Dark | ✓, and your own (4 colors per mode) | ✓, and your own (4 colors per mode) | ✓                                                                          |
+| 7 themes, a light and a dark pick; System / Light / Dark | ✓, and your own (4 colors per mode) | ✓, and your own (4 colors per mode) | ✓, and wears yours (made on Mac or web)                                    |
 | Panel animations                                         | ✓                                   | ✓                                   | —                                                                          |
 | Keyboard shortcuts, rebindable (incl. move to label)     | ✓                                   | ✓                                   | —                                                                          |
 | Command palette (⌘K)                                     | ✓                                   | ✓                                   | —                                                                          |

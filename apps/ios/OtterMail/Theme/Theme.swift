@@ -124,6 +124,15 @@ struct RGB {
 
     var color: Color { Color(red: r, green: g, blue: b) }
 
+    /** "#rrggbb", each channel rounded as the web app rounds it. */
+    var hex: String {
+        let byte = { (c: Double) in Int((c * 255).rounded()) }
+        return String(format: "#%02x%02x%02x", byte(r), byte(g), byte(b))
+    }
+
+    /** Oklab's L, 0 (black) to 1 (white). */
+    var lightness: Double { oklab.0 }
+
     func mixed(toward other: RGB, keep: Double) -> RGB {
         let (a, o) = (oklab, other.oklab)
         return RGB(oklab: (

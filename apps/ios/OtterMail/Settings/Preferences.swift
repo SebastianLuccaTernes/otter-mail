@@ -74,6 +74,8 @@ final class Preferences {
             ui("mail:mailboxes", Self.json(arrangement))
         }
     }
+    /** Themes made on the Mac or the web: worn and picked here, never written (so not in `uiSection`). */
+    private(set) var customThemes: [Theme]
     var notifications: Notifications { didSet { setting("notificationsMode", notifications.rawValue) } }
     /** BCP-47 codes, first = where translations go; empty = the system's languages. */
     var readLanguages: [String] { didSet { setting("readLanguages", readLanguages) } }
@@ -113,6 +115,11 @@ final class Preferences {
     func apply(ui: [String: Any], settings: [String: Any]) {
         applying = true
         defer { applying = false }
+        // Before the theme ids, which may name one of them.
+        if let raw = ui["otter:custom-themes"] as? String, raw != defaults.string(forKey: "otter:custom-themes") {
+            defaults.set(raw, forKey: "otter:custom-themes")
+            customThemes = CustomTheme.themes(raw)
+        }
         if let value = (ui["otter:theme-source"] as? String).flatMap(Scheme.init), value != scheme { scheme = value }
         if let value = ui["otter:theme:light"] as? String, value != lightTheme { lightTheme = value }
         if let value = ui["otter:theme:dark"] as? String, value != darkTheme { darkTheme = value }
@@ -136,10 +143,17 @@ final class Preferences {
         advance = defaults.string(forKey: "gmail:advance-direction").flatMap(Advance.init) ?? .next
         arrangement = defaults.string(forKey: "mail:mailboxes")?.data(using: .utf8)
             .flatMap { try? JSONDecoder().decode(Arrangement.self, from: $0) } ?? Arrangement()
+        customThemes = CustomTheme.themes(defaults.string(forKey: "otter:custom-themes"))
         notifications = defaults.string(forKey: "settings.notificationsMode").flatMap(Notifications.init) ?? .inbox
         readLanguages = defaults.stringArray(forKey: "settings.readLanguages") ?? []
         autoTranslate = defaults.bool(forKey: "settings.autoTranslate")
     }
+
+    /** A stock theme, or one of the account's own. */
+    func theme(_ id: String) -> Theme? { Theme.named(id) ?? customThemes.first { $0.id == id } }
+
+    /** Every theme to pick from: the stock ones, then the account's own. */
+    var themes: [Theme] { Theme.all + customThemes }
 
     /** The languages the user reads, falling back to the system's. */
     var effectiveReadLanguages: [String] {

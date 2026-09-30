@@ -2,7 +2,8 @@ import SwiftUI
 
 /**
  * Themes, as in the desktop's Settings › Appearance: tap a theme to wear it
- * in light and dark, or one of its orbs for that appearance only.
+ * in light and dark, or one of its orbs for that appearance only. The
+ * account's own themes (made there) follow the stock ones.
  */
 struct ThemeSettings: View {
     @Environment(Preferences.self) private var preferences
@@ -10,20 +11,26 @@ struct ThemeSettings: View {
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                ForEach(Theme.all) { theme in
-                    ThemeCard(
-                        theme: theme,
-                        light: preferences.lightTheme == theme.id,
-                        dark: preferences.darkTheme == theme.id,
-                        onPick: { modes in
-                            withAnimation(.smooth) {
-                                if modes.contains(.light) { preferences.lightTheme = theme.id }
-                                if modes.contains(.dark) { preferences.darkTheme = theme.id }
+            VStack(alignment: .leading, spacing: 16) {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                    ForEach(preferences.themes) { theme in
+                        ThemeCard(
+                            theme: theme,
+                            light: preferences.lightTheme == theme.id,
+                            dark: preferences.darkTheme == theme.id,
+                            onPick: { modes in
+                                withAnimation(.smooth) {
+                                    if modes.contains(.light) { preferences.lightTheme = theme.id }
+                                    if modes.contains(.dark) { preferences.darkTheme = theme.id }
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
+                Text("Make your own in Settings › Appearance on the Mac or the web.")
+                    .font(.footnote)
+                    .foregroundStyle(palette.muted)
+                    .padding(.horizontal, 4)
             }
             .padding(20)
         }
