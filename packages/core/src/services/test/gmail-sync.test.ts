@@ -381,6 +381,8 @@ afterEach(() => {
 });
 
 describe("Gmail sync", () => {
+  // A whole fill and three pushes: about 1.5s alone, past the 5s default on a
+  // busy CI runner that builds the apps alongside.
   it("brings new mail while the first sync is still filling the mailbox", async () => {
     for (let i = 1; i <= 8; i++) deliver(`old${i}`, ["INBOX"], Date.now() - i * 60_000);
     let release!: () => void;
@@ -410,7 +412,7 @@ describe("Gmail sync", () => {
     expect(fetches.every((f) => f.format === "full")).toBe(true);
     expect(new Set(fetches.map((f) => f.id)).size).toBe(fetches.length);
     expect(mailStore.getMessageDetail(account.id, "old8")?.bodyText).toBe("Body of old8");
-  });
+  }, 20_000);
 
   it("picks a stopped first sync up where it was when new mail comes in, not from the start", async () => {
     for (let i = 1; i <= 7; i++) deliver(`old${i}`, ["INBOX"], Date.now() - i * 60_000);
