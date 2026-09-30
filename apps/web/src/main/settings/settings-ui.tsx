@@ -115,7 +115,8 @@ export function SettingsGroup({
       {...props}
       data-slot={variant === "grouped" ? "settings-group" : undefined}
       className={cn(
-        "relative overflow-visible text-foreground",
+        // A search can leave a card without rows.
+        "relative overflow-visible text-foreground empty:hidden",
         variant === "grouped" ? "rounded-xl border border-border/60 bg-card" : "space-y-1",
         variant === "grouped" && divided && "[&>*+*]:border-t [&>*+*]:border-border/40",
         // Row hovers and selections follow the card's corners.
