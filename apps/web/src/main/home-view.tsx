@@ -548,7 +548,7 @@ function MailHome() {
     "commandPalette.toggle": () => setPaletteOpen((o) => !o),
     "sidebar.toggle": () => toggleSidebar(),
     "agent.toggle": () => toggleChat(),
-    "search.focus": () => searchFromView(),
+    "search.focus": () => (settingsRoute ? settingsSearchRef.current?.focus() : searchFromView()),
     "compose.new": () => setComposeOpen(true),
     "keybindings.show": () =>
       setSettingsRoute({ pane: "keybindings", viewId: null, mailbox: null }),
