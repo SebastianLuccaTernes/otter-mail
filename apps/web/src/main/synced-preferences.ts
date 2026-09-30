@@ -12,6 +12,8 @@ const THEME_SOURCE = "otter:theme-source";
 
 const SYNCED_KEYS = [
   THEME_SOURCE,
+  // Before the picks: apply() goes in order, so a synced theme exists before it's worn.
+  "otter:custom-themes",
   "otter:theme:light",
   "otter:theme:dark",
   "gmail:panel-animation-duration",

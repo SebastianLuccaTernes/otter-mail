@@ -7,9 +7,13 @@ import { toast } from "../gmail/toast";
 import type { NativeThemeInfo } from "@otter-mail/contracts";
 import { MoonIcon, SunIcon } from "lucide-react";
 import { cn, HintTooltip } from "../gmail/ui";
-import { setThemeForAppearance, themeColors, useThemeChoice } from "../theme/apply-theme";
 import {
-  APP_THEMES,
+  setThemeForAppearance,
+  themeColors,
+  useAppThemes,
+  useThemeChoice,
+} from "../theme/apply-theme";
+import {
   type ThemeAppearance,
   type ThemeColors,
   type ThemeDefinition,
@@ -321,6 +325,7 @@ function useDockBadge(): [boolean, (next: boolean) => Promise<void>] {
 
 export function AppearancePane() {
   const choice = useThemeChoice();
+  const themes = useAppThemes();
   const [scheme, setScheme] = useColorScheme();
   const [dockBadge, setDockBadge] = useDockBadge();
 
@@ -359,7 +364,7 @@ export function AppearancePane() {
         variant="plain"
       >
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {APP_THEMES.map((theme) => (
+          {themes.map((theme) => (
             <ThemeCard
               key={theme.id}
               theme={theme}

@@ -8,7 +8,13 @@ import {
   getThemeColorsForAppearance,
   type ThemeAppearance,
   type ThemeColors,
+  type ThemeDefinition,
 } from "@otter-mail/shared/themes";
+import {
+  customThemeDefinition,
+  parseCustomThemes,
+  type CustomTheme,
+} from "@otter-mail/shared/custom-themes";
 
 /**
  * App color themes, the Otter Code model: each appearance (light, dark)
@@ -27,12 +33,69 @@ const STORAGE_KEY: Record<ThemeAppearance, "otter:theme:light" | "otter:theme:da
 };
 const CHANGE_EVENT = "otter:theme-change";
 
+/** The user's own themes (packages/shared's custom-themes), synced with the account. */
+const CUSTOM_THEMES_KEY = "otter:custom-themes";
+
+/** The stored list, parsed once per change of its raw string. */
+let customCache: { raw: string | null; themes: CustomTheme[]; definitions: ThemeDefinition[] } = {
+  raw: null,
+  themes: [],
+  definitions: [],
+};
+
+function readCustomThemes(): typeof customCache {
+  const raw = localStorage.getItem(CUSTOM_THEMES_KEY);
+  if (raw !== customCache.raw) {
+    const themes = parseCustomThemes(raw);
+    customCache = { raw, themes, definitions: themes.map(customThemeDefinition) };
+  }
+  return customCache;
+}
+
+export function getCustomThemes(): CustomTheme[] {
+  return readCustomThemes().themes;
+}
+
+/** Every theme to pick from: the built-ins, then the user's own. */
+export function appThemes(): ThemeDefinition[] {
+  return [...APP_THEMES, ...readCustomThemes().definitions];
+}
+
+function findTheme(id: string): ThemeDefinition | undefined {
+  return (
+    APP_THEMES.find((t) => t.id === id) ?? readCustomThemes().definitions.find((t) => t.id === id)
+  );
+}
+
+/** Adds the theme, or replaces the one with its id. */
+export function saveCustomTheme(theme: CustomTheme): void {
+  const list = getCustomThemes();
+  const next = list.some((t) => t.id === theme.id)
+    ? list.map((t) => (t.id === theme.id ? theme : t))
+    : [...list, theme];
+  setSyncedPreference(CUSTOM_THEMES_KEY, JSON.stringify(next));
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+/** Removes the theme; an appearance wearing it goes back to the initial theme. */
+export function deleteCustomTheme(id: string): void {
+  const choice = getThemeChoice();
+  for (const mode of ["light", "dark"] as const) {
+    if (choice[mode] === id) setThemeForAppearance(mode, INITIAL_THEME_ID);
+  }
+  setSyncedPreference(
+    CUSTOM_THEMES_KEY,
+    JSON.stringify(getCustomThemes().filter((t) => t.id !== id)),
+  );
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
 export type ThemeChoice = Record<ThemeAppearance, string>;
 
 export function getThemeChoice(): ThemeChoice {
   const read = (mode: ThemeAppearance) => {
     const id = localStorage.getItem(STORAGE_KEY[mode]);
-    return id && APP_THEMES.some((t) => t.id === id) ? id : INITIAL_THEME_ID;
+    return id && findTheme(id) ? id : INITIAL_THEME_ID;
   };
   return { light: read("light"), dark: read("dark") };
 }
@@ -45,7 +108,7 @@ export function setThemeForAppearance(mode: ThemeAppearance, themeId: string): v
 }
 
 export function themeColors(themeId: string, mode: ThemeAppearance): ThemeColors {
-  const theme = APP_THEMES.find((t) => t.id === themeId) ?? OTTER_THEME;
+  const theme = findTheme(themeId) ?? OTTER_THEME;
   return (
     getThemeColorsForAppearance(theme, mode) ??
     (mode === "dark" ? OTTER_DARK_THEME_COLORS : OTTER_LIGHT_THEME_COLORS)
@@ -158,7 +221,7 @@ export function applyAppTheme(): void {
   const mode = appearance();
   const themeId = previewId ?? getThemeChoice()[mode];
   const colors = themeColors(themeId, mode);
-  const exact = APP_THEMES.find((t) => t.id === themeId)?.exact ?? false;
+  const exact = findTheme(themeId)?.exact ?? false;
 
   const root = document.documentElement;
   withoutTransitions(root);
@@ -185,7 +248,8 @@ export function startAppTheme(): () => void {
   applyAppTheme();
   const mq = window.matchMedia("(prefers-color-scheme: dark)");
   const onStorage = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY.light || e.key === STORAGE_KEY.dark) applyAppTheme();
+    if (e.key === STORAGE_KEY.light || e.key === STORAGE_KEY.dark || e.key === CUSTOM_THEMES_KEY)
+      applyAppTheme();
   };
   mq.addEventListener("change", applyAppTheme);
   window.addEventListener(CHANGE_EVENT, applyAppTheme);
@@ -200,7 +264,7 @@ export function startAppTheme(): () => void {
 /** Whether the theme this window wears keeps its own primary (no per-account color). */
 function isMonochrome(): boolean {
   const id = previewId ?? getThemeChoice()[appearance()];
-  return APP_THEMES.find((t) => t.id === id)?.monochrome ?? false;
+  return findTheme(id)?.monochrome ?? false;
 }
 
 /** `isMonochrome`, re-read on theme picks and appearance switches. */
@@ -234,4 +298,19 @@ export function useThemeChoice(): ThemeChoice {
     };
   }, []);
   return choice;
+}
+
+/** `appThemes`, re-read when the user's own themes change (for pickers). */
+export function useAppThemes(): ThemeDefinition[] {
+  const [themes, setThemes] = useState(appThemes);
+  useEffect(() => {
+    const update = () => setThemes(appThemes());
+    window.addEventListener(CHANGE_EVENT, update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener(CHANGE_EVENT, update);
+      window.removeEventListener("storage", update);
+    };
+  }, []);
+  return themes;
 }

@@ -44,8 +44,12 @@ import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { senderLabel } from "./address";
 import { cn } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
-import { APP_THEMES } from "@otter-mail/shared/themes";
-import { previewTheme, setThemeForAppearance, useThemeChoice } from "../theme/apply-theme";
+import {
+  previewTheme,
+  setThemeForAppearance,
+  useAppThemes,
+  useThemeChoice,
+} from "../theme/apply-theme";
 import type { GmailAccount, GmailMessageSummary, MailView } from "./types";
 import type { SettingsPane } from "./api";
 import type { KeybindingCommand } from "../keybindings/commands";
@@ -185,6 +189,7 @@ export function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const themeChoice = useThemeChoice();
+  const themes = useAppThemes();
   const update = useUpdateState();
   const [scheme, setScheme] = useState<"system" | "light" | "dark">("system");
 
@@ -263,7 +268,7 @@ export function CommandPalette({
         {
           id: "theme",
           label: "Change theme",
-          items: APP_THEMES.map((t) => ({
+          items: themes.map((t) => ({
             id: `theme:${t.id}`,
             icon: <PaletteIcon className={ICON} />,
             title: t.label,
@@ -458,6 +463,7 @@ export function CommandPalette({
     query,
     scheme,
     themeChoice,
+    themes,
     update,
     accounts,
     views,
