@@ -36,18 +36,23 @@ const CHANGE_EVENT = "otter:theme-change";
 /** The user's own themes (packages/shared's custom-themes), synced with the account. */
 const CUSTOM_THEMES_KEY = "otter:custom-themes";
 
-/** The stored list, parsed once per change of its raw string. */
-let customCache: { raw: string | null; themes: CustomTheme[]; definitions: ThemeDefinition[] } = {
-  raw: null,
-  themes: [],
-  definitions: [],
-};
+/**
+ * The stored list, parsed once per change of its raw string. `all` keeps its
+ * identity until then, so the pickers holding it don't re-render for nothing.
+ */
+let customCache: {
+  raw: string | null;
+  themes: CustomTheme[];
+  definitions: ThemeDefinition[];
+  all: ThemeDefinition[];
+} = { raw: null, themes: [], definitions: [], all: [...APP_THEMES] };
 
 function readCustomThemes(): typeof customCache {
   const raw = localStorage.getItem(CUSTOM_THEMES_KEY);
   if (raw !== customCache.raw) {
     const themes = parseCustomThemes(raw);
-    customCache = { raw, themes, definitions: themes.map(customThemeDefinition) };
+    const definitions = themes.map(customThemeDefinition);
+    customCache = { raw, themes, definitions, all: [...APP_THEMES, ...definitions] };
   }
   return customCache;
 }
@@ -58,7 +63,7 @@ export function getCustomThemes(): CustomTheme[] {
 
 /** Every theme to pick from: the built-ins, then the user's own. */
 export function appThemes(): ThemeDefinition[] {
-  return [...APP_THEMES, ...readCustomThemes().definitions];
+  return readCustomThemes().all;
 }
 
 function findTheme(id: string): ThemeDefinition | undefined {
@@ -73,8 +78,7 @@ export function saveCustomTheme(theme: CustomTheme): void {
   const next = list.some((t) => t.id === theme.id)
     ? list.map((t) => (t.id === theme.id ? theme : t))
     : [...list, theme];
-  setSyncedPreference(CUSTOM_THEMES_KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event(CHANGE_EVENT));
+  storeCustomThemes(next);
 }
 
 /** Removes the theme; an appearance wearing it goes back to the initial theme. */
@@ -83,10 +87,11 @@ export function deleteCustomTheme(id: string): void {
   for (const mode of ["light", "dark"] as const) {
     if (choice[mode] === id) setThemeForAppearance(mode, INITIAL_THEME_ID);
   }
-  setSyncedPreference(
-    CUSTOM_THEMES_KEY,
-    JSON.stringify(getCustomThemes().filter((t) => t.id !== id)),
-  );
+  storeCustomThemes(getCustomThemes().filter((t) => t.id !== id));
+}
+
+function storeCustomThemes(list: CustomTheme[]): void {
+  setSyncedPreference(CUSTOM_THEMES_KEY, JSON.stringify(list));
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
