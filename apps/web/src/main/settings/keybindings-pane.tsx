@@ -53,6 +53,9 @@ import {
   SettingsPageContainer,
   SettingsRow,
   SettingsSectionHeader,
+  settingsSearchHideEmpty,
+  useSettingsSearch,
+  useSettingsSearchMatch,
 } from "./settings-ui";
 
 /**
@@ -377,9 +380,15 @@ function KeybindingRow({ row, rows }: { row: Row; rows: Row[] }) {
   const warning = warningFor(rows, row.id, keyDraft, whenDraft);
   const commit = () =>
     void save({ command: rule.command, key: keyDraft, when: whenDraft || undefined }, rule);
+  const shortcut = parseShortcut(rule.key);
+  const keys = shortcut ? formatShortcut(shortcut) : rule.key;
+  if (!useSettingsSearchMatch(commandLabel(rule.command), keys)) return null;
 
   return (
-    <div className="group/row flex min-h-14 items-center gap-6 px-[17px] py-2">
+    <div
+      data-slot="settings-row"
+      className="group/row flex min-h-14 items-center gap-6 px-[17px] py-2"
+    >
       <div className="min-w-0 flex-1">
         <div className="flex min-h-5 items-center gap-2 text-sm text-foreground">
           <HintTooltip label={rule.command}>
@@ -625,8 +634,10 @@ export function KeybindingsPane() {
   useEffect(() => {
     if (searchOpen) searchRef.current?.focus();
   }, [searchOpen]);
-  // ⌘F searches the bindings while this page is open.
-  useCommandHandlers({ "search.focus": () => setSearchOpen(true) });
+  // ⌘F searches the bindings while this page is open (the settings search owns it
+  // while this page is one of its results).
+  const settingsSearch = useSettingsSearch();
+  useCommandHandlers(settingsSearch.query ? {} : { "search.focus": () => setSearchOpen(true) });
 
   const rows = useMemo<Row[]>(
     () =>
@@ -718,7 +729,7 @@ export function KeybindingsPane() {
       ) : null}
       <div className="space-y-7">
         {groups.map((group) => (
-          <section key={group.name}>
+          <section key={group.name} {...settingsSearchHideEmpty(settingsSearch, false)}>
             <SettingsSectionHeader title={group.name} muted />
             <div className="[&>*+*]:border-t [&>*+*]:border-border/40">
               {group.rows.map((row) => (
@@ -728,7 +739,7 @@ export function KeybindingsPane() {
           </section>
         ))}
       </div>
-      {visible.length === 0 && !adding ? (
+      {visible.length === 0 && !adding && !settingsSearch.query ? (
         <div className="py-12 text-center text-sm text-muted-foreground">
           No keybindings match your search.
         </div>
