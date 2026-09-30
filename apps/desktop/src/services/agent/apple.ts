@@ -1,10 +1,10 @@
 /**
  * Apple's on-device model as an agent (Foundation Models), through the Apple
  * helper's `agent` command (native/apple-helper, Agent.swift). The model runs
- * on this Mac with Otter Mail's tools, the ones Claude and Codex get over MCP,
- * called here directly: the same tools, approvals and steps. Nothing leaves
- * the Mac, chats included: each is kept as the model's transcript, in
- * `apple-chats/`.
+ * on this Mac with core's on-device toolset (tools/on-device.ts): a few of
+ * Otter Mail's tools, shaped for a small model, with the same approvals and
+ * steps as the others. Nothing leaves the Mac, chats included: each is kept
+ * as the model's transcript, in `apple-chats/`.
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
@@ -19,6 +19,7 @@ import {
   agentTools,
   cancelToolApprovals,
   mcpStep,
+  onDeviceInstructions,
   runAgentTool,
   type ChatProvider,
   type ChatSession,
@@ -31,12 +32,8 @@ import {
 import { appInfo } from "../../backend-protocol.js";
 import { logger } from "../../logger.js";
 import { helperPath, runHelper } from "../apple-helper.js";
-import { AGENT_INSTRUCTIONS } from "./instructions.js";
 
-/**
- * How much of a tool's result the model reads. Its context is 8K tokens, the
- * tools take 3K of them, and one conversation can be 30,000 characters.
- */
+/** How much of a tool's result the model reads: its whole context is 8K tokens. */
 const RESULT_CHARS = 4_000;
 
 /** The renderer's handoff block after a question, which the chat shows without. */
@@ -138,12 +135,6 @@ function messages(chat: Chat): ChatSessionMessage[] {
   });
 }
 
-/** Otter Mail's instructions for every agent, and the date (the model has no clock). */
-function instructions(): string {
-  const today = new Date().toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" });
-  return `${AGENT_INSTRUCTIONS}\nIt's ${today}.`;
-}
-
 // ── The tools' caller, one per chat ──────────────────────────────────────────
 
 type ChatTools = {
@@ -161,7 +152,7 @@ function toolsFor(chatId: string): ChatTools {
     const state: ChatTools = {
       mode: "approval-required",
       turn: null,
-      caller: { mode: () => state.mode, turn: () => state.turn },
+      caller: { toolset: "on-device", mode: () => state.mode, turn: () => state.turn },
     };
     chatTools.set(chatId, (tools = state));
   }
@@ -316,7 +307,9 @@ export const appleProvider: ChatProvider = {
     send({
       type: "turn",
       id: input.requestId,
-      ...(resuming ? { transcript: chat.transcript } : { instructions: instructions() }),
+      ...(resuming
+        ? { transcript: chat.transcript }
+        : { instructions: await onDeviceInstructions() }),
       tools: agentTools(tools.caller).map((t) => ({
         name: t.name,
         description: t.description,

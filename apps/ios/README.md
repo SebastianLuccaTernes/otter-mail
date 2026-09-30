@@ -43,8 +43,8 @@ SMTP servers directly too (`docs/imap.md`); the relay never sees its mail, token
   follow the Otter account. Debug builds trust any certificate from localhost, to test against
   GreenMail or Dovecot in Docker.
 - `Agent/`: the agent, as on the desktop. Apple's on-device model (`AppleAgent.swift`, Foundation
-  Models) has Otter Mail's tools (`AgentTools.swift`: core's mail tools the phone can run, by the
-  same names, arguments and results) over the mail on the phone, so nothing leaves it; its chats
+  Models) has core's on-device toolset (`AgentTools.swift`: the same six tools, by the same names,
+  arguments and results) over the mail on the phone, so nothing leaves it; its chats
   are kept on the phone and go when the account signs out. Hermes (`Hermes.swift`) runs anywhere,
   so it runs here: the same server-side chats, model and key (the `assistant` preferences section,
   under its old name, and the sealed `hermesKey` follow the Otter account). Conversations go to

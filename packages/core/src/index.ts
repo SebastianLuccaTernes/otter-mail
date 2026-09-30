@@ -79,6 +79,7 @@ export {
   OTTER_TOOLS_SERVER,
   agentTools,
   cancelToolApprovals,
+  onDeviceInstructions,
   runAgentTool,
   type AgentTool,
   type ToolCaller,

@@ -772,17 +772,13 @@ export const mailTools: AgentTool[] = [
     name: "save_draft",
     title: "Save a draft",
     description:
-      "Writes a message into the mailbox's Drafts without sending it, for the user to review and send from Otter Mail: the safe way to prepare mail. A reply needs only replyTo (the conversation's threadId works) and body. With draftId, replaces that draft.",
+      "Writes a message into the mailbox's Drafts without sending it, for the user to review and send from Otter Mail. The safe way to prepare mail. With draftId, replaces that draft.",
     input: {
       type: "object",
       properties: {
         ...COMPOSE_INPUT,
         account: { type: "string", description: "The mailbox the draft is in (its address)." },
-        draftId: {
-          type: "string",
-          description:
-            "An existing draft to replace (its draftId from get_thread); leave it out for a new one.",
-        },
+        draftId: { type: "string", description: "The draft to replace." },
       },
     },
     // A draft sends nothing and is the user's to look at: no approval.

@@ -2,10 +2,10 @@ import Foundation
 import FoundationModels
 
 /**
- * Apple's on-device model as an agent (Foundation Models), with Otter Mail's
- * tools on the iPhone (AgentTools.swift). The model runs here and nothing
- * leaves the phone, chats included: each is kept as the model's transcript,
- * in Application Support, and goes when the account signs out.
+ * Apple's on-device model as an agent (Foundation Models), with core's
+ * on-device toolset on the iPhone (AgentTools.swift). The model runs here
+ * and nothing leaves the phone, chats included: each is kept as the model's
+ * transcript, in Application Support, and goes when the account signs out.
  */
 final class AppleAgent {
     struct Chat: Codable {
@@ -52,7 +52,7 @@ final class AppleAgent {
 
     /** One turn, the answer streamed to `onText` as it grows; the chat is kept after, however it ends. */
     func respond(to prompt: String, title: String, onText: (String) -> Void) async throws {
-        let session = session ?? LanguageModelSession(tools: tools.all.map { $0 as any Tool }, instructions: Self.instructions)
+        let session = session ?? LanguageModelSession(tools: tools.all.map { $0 as any Tool }, instructions: instructions)
         self.session = session
         defer { keep(session.transcript, title: title) }
         for try await snapshot in session.streamResponse(to: prompt) {
@@ -71,14 +71,14 @@ final class AppleAgent {
         }
     }
 
-    /** What every agent is told about Otter Mail (the Mac's AGENT_INSTRUCTIONS), for the tools the phone has. */
-    private static var instructions: String {
-        """
-        You are the agent built into Otter Mail, a mail client, on the user's iPhone.
-        The user's mailboxes (Gmail, IMAP, …) are yours through the otter-mail tools: list_accounts, search_mail, list_threads, get_thread, update_threads, save_draft, send_email and the rest. Use them for anything about the user's mail.
-        Messages may end with a '— context from Otter Mail —' block that points at conversations by mailbox and threadId; read them with get_thread when you need them.
-        When the user wants to write to someone, save the message with save_draft (a reply's replyTo can be the conversation's threadId) rather than only writing it out; send it only if they asked for it to be sent. Never send an email, or take any other irreversible action on the user's mailboxes, unless the user explicitly asks for it in this conversation.
-        It's \(Date.now.formatted(date: .complete, time: .shortened)).
+    /** What Apple's model is told (core's onDeviceInstructions), with the date and the user's addresses. */
+    private var instructions: String {
+        let mailboxes = tools.mailStore()?.mailboxes.map(\.email).joined(separator: ", ") ?? ""
+        return """
+        You are the agent in Otter Mail, the user's mail app. It's \(Date.now.formatted(date: .complete, time: .shortened)). The user's mailboxes: \(mailboxes).
+        Use the tools for anything about the user's mail. Each conversation has an id: copy it exactly from list_inbox or search_mail.
+        To answer someone, call save_reply with the conversation's id and your text; to write to someone new, call write_email. Both save a draft for the user to send: call them rather than only writing the text out.
+        Mention conversations by sender and subject, never by id. Be brief.
         """
     }
 
